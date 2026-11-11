@@ -77,7 +77,7 @@ Two rules apply in every language:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v5
+  - uses: actions/checkout@v7
   - uses: xSAVIKx/run-aws-emulator@v1
   - run: aws sts get-caller-identity   # and then your own tests
 ```

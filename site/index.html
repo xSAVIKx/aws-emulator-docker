@@ -524,7 +524,7 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
   test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: xSAVIKx/run-aws-emulator@v1
       - run: aws sts get-caller-identity   # "Account": "000000000000"
       - run: make integration-test         # your SDK tests use the emulator</code><button class="copy" type="button">Copy</button></pre>
