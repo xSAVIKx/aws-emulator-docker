@@ -1,0 +1,105 @@
+# Runs the CI example from the README and the blog post as written, on
+# both runner architectures. It also measures the time to healthy and the
+# uncompressed image size. Start it manually.
+name: Example integration job
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Image reference to test
+        default: ghcr.io/xsavikx/aws-emulator:1.0.322.1@sha256:743172fa4509c73580af3fdd1a40fbd7eb7f91b98e19bc84e5c9595e9ce04487
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    env:
+      EMU_PORT: "9297"
+      IMAGE: ${{ inputs.image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Pull image
+        run: docker pull "$IMAGE"
+
+      - name: Start AWS Emulator
+        run: |
+          date +%s.%N > "$RUNNER_TEMP/start"
+          mkdir -p "$HOME/.aws/emulator"
+          docker run -d --name aws-emulator --memory=2g --memory-swap=2g \
+            -p "127.0.0.1:$EMU_PORT:$EMU_PORT" \
+            --user "$(id -u):$(id -g)" \
+            -e HOME="$HOME" -e EMULATOR_TELEMETRY=off \
+            -e EMULATOR_HEALTHCHECK_PORT="$EMU_PORT" \
+            -v "$HOME/.aws/emulator:$HOME/.aws/emulator" \
+            "$IMAGE" -p "$EMU_PORT"
+
+      - name: Wait until healthy
+        run: |
+          D="$HOME/.aws/emulator/$EMU_PORT"
+          for _ in $(seq 60); do
+            if curl -sf --cacert "$D/ca.pem" "https://127.0.0.1:$EMU_PORT/__admin/health"; then
+              echo
+              echo "Time to healthy (incl. 1 s poll): $(echo "$(date +%s.%N) - $(cat "$RUNNER_TEMP/start")" | bc) s"
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs aws-emulator
+          exit 1
+
+      - name: Point AWS SDKs at the emulator
+        run: |
+          D="$HOME/.aws/emulator/$EMU_PORT"
+          {
+            echo "AWS_ENDPOINT_URL=https://127.0.0.1:$EMU_PORT"
+            echo "AWS_SHARED_CREDENTIALS_FILE=$D/emulator_credentials"
+            echo "AWS_CONFIG_FILE=$D/config"
+            echo "AWS_CA_BUNDLE=$D/ca.pem"
+            echo "NODE_EXTRA_CA_CERTS=$D/ca.pem"
+            echo "AWS_EC2_METADATA_DISABLED=true"
+            echo "AWS_DISABLE_HOST_PREFIX_INJECTION=true"
+            echo "AWS_REGION=us-west-2"
+            echo "AWS_DEFAULT_REGION=us-west-2"
+          } >> "$GITHUB_ENV"
+
+      - name: Integration tests
+        run: |
+          set -euxo pipefail
+          aws sts get-caller-identity
+          aws s3 mb s3://example-bucket
+          echo hello > hello.txt
+          aws s3 cp hello.txt s3://example-bucket/hello.txt
+          aws s3 ls s3://example-bucket/
+          test "$(aws s3 cp s3://example-bucket/hello.txt -)" = hello
+
+      - name: Measurements
+        if: always()
+        run: |
+          echo "Architecture: $(uname -m)"
+          echo "Uncompressed image size (bytes): $(docker image inspect "$IMAGE" -f '{{.Size}}')"
+          docker images --digests | head -5
+          echo "Container health: $(docker inspect -f '{{.State.Health.Status}}' aws-emulator)"
+          for i in 1 2 3 4 5; do
+            p=$((19500 + i)); d="$RUNNER_TEMP/h$i/.aws/emulator"; mkdir -p "$d"
+            s=$(date +%s.%N)
+            docker run -d --name "t$i" -p "127.0.0.1:$p:$p" --user "$(id -u):$(id -g)" \
+              -e HOME="$RUNNER_TEMP/h$i" -e EMULATOR_TELEMETRY=off -v "$d:$d" "$IMAGE" -p "$p" >/dev/null
+            until curl -sf --cacert "$d/$p/ca.pem" "https://127.0.0.1:$p/__admin/health" >/dev/null 2>&1; do sleep 0.1; done
+            echo "Sample $i time to healthy: $(echo "$(date +%s.%N) - $s" | bc) s"
+            docker rm -f "t$i" >/dev/null
+          done
+
+      - name: Emulator logs
+        if: failure()
+        run: docker logs aws-emulator
