@@ -82,5 +82,6 @@ steps:
   - run: aws sts get-caller-identity   # and then your own tests
 ```
 
-The action is [xSAVIKx/run-aws-emulator](https://github.com/xSAVIKx/run-aws-emulator).
+The action is [Run AWS Emulator](https://github.com/marketplace/actions/run-aws-emulator) on the GitHub Marketplace
+([source](https://github.com/xSAVIKx/run-aws-emulator)).
 Pin the image to a build tag or a digest for reproducible runs.

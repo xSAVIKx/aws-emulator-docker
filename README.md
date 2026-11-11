@@ -3,6 +3,7 @@
 [![Build and publish](https://github.com/xSAVIKx/aws-emulator-docker/actions/workflows/release.yml/badge.svg)](https://github.com/xSAVIKx/aws-emulator-docker/actions/workflows/release.yml)
 [![Lint](https://github.com/xSAVIKx/aws-emulator-docker/actions/workflows/lint.yml/badge.svg)](https://github.com/xSAVIKx/aws-emulator-docker/actions/workflows/lint.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Run%20AWS%20Emulator-orange?logo=github)](https://github.com/marketplace/actions/run-aws-emulator)
 
 Website: <https://xsavikx.github.io/aws-emulator-docker/>
 
@@ -120,7 +121,7 @@ UID_GID="$(id -u):$(id -g)" docker compose up
 - [`examples/`](examples/) has integration tests in Python (pytest), TypeScript (Vitest),
   Java (JUnit 5), Go (`go test`), C# (xUnit) and Rust (`cargo test`). They cover STS, S3,
   DynamoDB, SQS, SNS to SQS and Secrets Manager. CI runs them on amd64 and arm64.
-- The [Run AWS Emulator](https://github.com/xSAVIKx/run-aws-emulator) GitHub Action starts
+- The [Run AWS Emulator](https://github.com/marketplace/actions/run-aws-emulator) GitHub Action ([source](https://github.com/xSAVIKx/run-aws-emulator)) starts
   the emulator in your own workflow and sets the SDK environment:
 
   ```yaml
