@@ -25,7 +25,7 @@ concurrency:
 env:
   IMAGE_NAME: aws-emulator
   GHCR_IMAGE: ghcr.io/xsavikx/aws-emulator
-  DOWNLOAD_BASE: https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/latest
+  DOWNLOAD_BASE: https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS
 
 jobs:
   resolve:
@@ -34,8 +34,8 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
       upstream_version: ${{ steps.v.outputs.upstream_version }}
-      sha_amd64: ${{ steps.v.outputs.sha_amd64 }}
-      sha_arm64: ${{ steps.v.outputs.sha_arm64 }}
+      sha_amd64: ${{ steps.sha.outputs.sha_amd64 }}
+      sha_arm64: ${{ steps.sha.outputs.sha_arm64 }}
       publish: ${{ steps.publish.outputs.publish }}
       created: ${{ steps.v.outputs.created }}
       base_name: ${{ steps.base.outputs.name }}
@@ -54,31 +54,18 @@ jobs:
           echo "name=${ref%@*}" | tee -a "$GITHUB_OUTPUT"
           echo "digest=${ref#*@}" | tee -a "$GITHUB_OUTPUT"
 
-      - name: Resolve version and checksums
+      - name: Resolve upstream version
         id: v
         shell: bash
         run: |
           set -euo pipefail
-          ver() { curl -fsSIL "$DOWNLOAD_BASE/aws-emulator-$1.rpm" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-amz-meta-package-version"{print $2}' | tail -1; }
-          v_amd=$(ver x86_64); v_arm=$(ver aarch64)
-          echo "x86_64=$v_amd aarch64=$v_arm"
-          if [ -z "$v_amd" ] || [ "$v_amd" != "$v_arm" ]; then
-            echo "::error::Upstream versions differ or are missing (x86_64=$v_amd aarch64=$v_arm)"; exit 1
-          fi
-          sha() { curl -fsSL --retry 5 --retry-all-errors "$DOWNLOAD_BASE/aws-emulator-$1.rpm" | sha256sum | cut -d' ' -f1; }
-          sha_amd=$(sha x86_64); sha_arm=$(sha aarch64)
-          # Upstream package version is like 1.0.322.1; the emulator reports 1.0.322.
-          echo "upstream_version=$v_amd" >> "$GITHUB_OUTPUT"
-          echo "version=$(echo "$v_amd" | cut -d. -f1-3)" >> "$GITHUB_OUTPUT"
-          echo "sha_amd64=$sha_amd" >> "$GITHUB_OUTPUT"
-          echo "sha_arm64=$sha_arm" >> "$GITHUB_OUTPUT"
+          # One small request. The RPMs are downloaded only when a build is due.
+          upstream=$(curl -fsSL --retry 5 "$DOWNLOAD_BASE/versions.json" | jq -r '.versions[].version' | sort -V | tail -1)
+          [ -n "$upstream" ] || { echo "::error::No version in versions.json"; exit 1; }
+          # Package version is like 1.0.322.1. The emulator reports 1.0.322.
+          echo "upstream_version=$upstream" | tee -a "$GITHUB_OUTPUT"
+          echo "version=$(cut -d. -f1-3 <<<"$upstream")" | tee -a "$GITHUB_OUTPUT"
           echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-          {
-            echo "### Upstream AWS Emulator"
-            echo "| arch | package version | sha256 |"; echo "|---|---|---|"
-            echo "| x86_64 | $v_amd | \`$sha_amd\` |"
-            echo "| aarch64 | $v_arm | \`$sha_arm\` |"
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Decide whether to publish
         id: publish
@@ -100,8 +87,28 @@ jobs:
               fi ;;
           esac
           if [ "$EVENT" = "push" ] && [ "${GITHUB_REF}" != "refs/heads/main" ] && [[ "${GITHUB_REF}" != refs/tags/v* ]]; then publish=false; fi
-          [ "$FORCE" = "true" ] && publish=true
+          if [ "$FORCE" = "true" ]; then publish=true; fi
           echo "publish=$publish" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Checksums of the pinned RPMs
+        id: sha
+        if: steps.publish.outputs.publish == 'true' || github.event_name == 'pull_request'
+        shell: bash
+        env:
+          UPSTREAM: ${{ steps.v.outputs.upstream_version }}
+        run: |
+          set -euo pipefail
+          file() { echo "$DOWNLOAD_BASE/aws-emulator-${UPSTREAM%.*}-${UPSTREAM##*.}-$1.rpm"; }
+          sha() { curl -fsSL --retry 5 --retry-all-errors "$(file "$1")" | sha256sum | cut -d' ' -f1; }
+          sha_amd=$(sha x86_64); sha_arm=$(sha aarch64)
+          echo "sha_amd64=$sha_amd" >> "$GITHUB_OUTPUT"
+          echo "sha_arm64=$sha_arm" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Upstream AWS Emulator $UPSTREAM"
+            echo "| file | sha256 |"; echo "|---|---|"
+            echo "| \`$(basename "$(file x86_64)")\` | \`$sha_amd\` |"
+            echo "| \`$(basename "$(file aarch64)")\` | \`$sha_arm\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build:
     name: Build ${{ matrix.platform }}
@@ -163,6 +170,7 @@ jobs:
           tags: ${{ env.IMAGE_NAME }}:ci
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
+            EMULATOR_VERSION=${{ needs.resolve.outputs.upstream_version }}
             RPM_SHA256_AMD64=${{ needs.resolve.outputs.sha_amd64 }}
             RPM_SHA256_ARM64=${{ needs.resolve.outputs.sha_arm64 }}
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
@@ -190,6 +198,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
           build-args: |
+            EMULATOR_VERSION=${{ needs.resolve.outputs.upstream_version }}
             RPM_SHA256_AMD64=${{ needs.resolve.outputs.sha_amd64 }}
             RPM_SHA256_ARM64=${{ needs.resolve.outputs.sha_arm64 }}
           outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true

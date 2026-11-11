@@ -115,9 +115,11 @@ UID_GID="$(id -u):$(id -g)" docker compose up
   own shell does not reach the container.
 - **Health check.** The image has a Docker `HEALTHCHECK` that calls `/__admin/health`. If you
   use a port other than 9297, also set `-e EMULATOR_HEALTHCHECK_PORT=<port>`.
-- **User.** The image runs as UID 1000. On Linux, add `--user "$(id -u):$(id -g)"` so the
-  files in `~/.aws/emulator` belong to you. With rootless Docker or Podman, container UIDs
-  map to other host UIDs, so omit `--user` or use `--userns=keep-id` (Podman).
+- **User.** The image runs as UID 1000. On Linux with rootful Docker, add
+  `--user "$(id -u):$(id -g)"` so the files in `~/.aws/emulator` belong to you. With rootless
+  Docker, use `--user 0:0` instead: container root maps to your host user. Without it, or
+  with your own UID, the emulator stops with `Permission denied (os error 13)`. With Podman,
+  use `--userns=keep-id`.
 - **No Windows containers.** The emulator runs only on Linux. On Windows, use Linux
   containers (Docker Desktop with WSL 2).
 
@@ -132,8 +134,12 @@ Every published image has:
 - A keyless [cosign](https://github.com/sigstore/cosign) signature.
 - A GitHub artifact attestation (GHCR).
 
-The build checks the SHA-256 digest of each upstream RPM, and the base image is pinned by
-digest.
+The build downloads a pinned upstream version (from `versions.json`), checks the SHA-256
+digest of each RPM, and checks the RPM signature with the AWS package signing key
+(`SSM Publishing <ssm-publishing@amazon.com>`, fingerprint
+`98BC F336 A3BE 53B7 34E9 67C5 2E5B F49B D940 F624`, from
+<https://downloads.aws.com/keys/gpg/current.asc>, stored in [`keys/`](keys/)). The base image
+is pinned by digest.
 
 Verify a signature:
 
@@ -155,9 +161,12 @@ gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx
 docker buildx build --platform linux/amd64,linux/arm64 -t aws-emulator .
 ```
 
-The Dockerfile downloads the newest LTS RPM for each target architecture. Pass
-`--build-arg RPM_SHA256_AMD64=<sha>` and `--build-arg RPM_SHA256_ARM64=<sha>` to check the
-download. Run the tests with `tests/smoke.sh aws-emulator`.
+The Dockerfile downloads the pinned LTS RPM for each target architecture and checks its
+signature. To build another version, pass `--build-arg EMULATOR_VERSION=<version>` with a
+version from
+[`versions.json`](https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/versions.json),
+or `latest`. Pass `--build-arg RPM_SHA256_AMD64=<sha>` and `--build-arg RPM_SHA256_ARM64=<sha>`
+to also check the SHA-256 digests. Run the tests with `tests/smoke.sh aws-emulator`.
 
 ## Licenses
 

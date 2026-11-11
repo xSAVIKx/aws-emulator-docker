@@ -10,29 +10,46 @@
 ARG BASE_IMAGE=public.ecr.aws/amazonlinux/amazonlinux:2023-minimal@sha256:61cf86a8168c2e0b8fc6b6badaac64968044c947718508d88fac06e61a596e6d
 
 # ---------------------------------------------------------------------------
-# Stage 1: download the RPM for the target architecture.
+# Stage 1: download the RPM for the target architecture and verify it.
 # The RPM stays out of the final image layers.
 # ---------------------------------------------------------------------------
 FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS fetch
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG TARGETARCH
+# Upstream package version from versions.json, for example 1.0.322.1.
+# Set it to "latest" to use the moving LTS/latest URL.
+ARG EMULATOR_VERSION=1.0.322.1
 ARG EMULATOR_CHANNEL=LTS
 ARG EMULATOR_DOWNLOAD_BASE=https://downloads.aws.com/aws-emulator/packages/aws-emulator
+# AWS package signing key "SSM Publishing <ssm-publishing@amazon.com>".
+# Source: https://downloads.aws.com/keys/gpg/current.asc
+ARG SIGNING_KEY_FINGERPRINT=98BCF336A3BE53B734E967C52E5BF49BD940F624
 # Optional SHA-256 digests. CI sets them. When set, the build fails on a mismatch.
 ARG RPM_SHA256_AMD64=""
 ARG RPM_SHA256_ARM64=""
+COPY keys/aws-emulator-signing-key.asc /keys/aws-emulator-signing-key.asc
 RUN set -eu; \
     case "${TARGETARCH}" in \
       amd64) rpm_arch=x86_64;  want="${RPM_SHA256_AMD64}" ;; \
       arm64) rpm_arch=aarch64; want="${RPM_SHA256_ARM64}" ;; \
       *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
-    url="${EMULATOR_DOWNLOAD_BASE}/${EMULATOR_CHANNEL}/latest/aws-emulator-${rpm_arch}.rpm"; \
+    base="${EMULATOR_DOWNLOAD_BASE}/${EMULATOR_CHANNEL}"; \
+    if [ "${EMULATOR_VERSION}" = "latest" ]; then \
+      url="${base}/latest/aws-emulator-${rpm_arch}.rpm"; \
+    else \
+      url="${base}/aws-emulator-${EMULATOR_VERSION%.*}-${EMULATOR_VERSION##*.}-${rpm_arch}.rpm"; \
+    fi; \
     echo "Downloading ${url}"; \
     curl -fsSL --retry 5 --retry-all-errors -o /aws-emulator.rpm "${url}"; \
     if [ -n "${want}" ]; then \
       echo "${want}  /aws-emulator.rpm" | sha256sum -c -; \
-    fi
+    fi; \
+    rpmkeys --import /keys/aws-emulator-signing-key.asc; \
+    rpm -q --qf '%{VERSION}-%{RELEASE}\n' gpg-pubkey; \
+    fp_short="$(echo "${SIGNING_KEY_FINGERPRINT}" | tail -c 9 | tr 'A-F' 'a-f')"; \
+    rpm -q gpg-pubkey --qf '%{VERSION}\n' | grep -qx "${fp_short}"; \
+    rpmkeys --checksig /aws-emulator.rpm | tee /dev/stderr | grep -Eq ': (digests )?signatures OK$'
 
 # ---------------------------------------------------------------------------
 # Stage 2: runtime image.
