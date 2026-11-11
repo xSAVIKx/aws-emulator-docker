@@ -134,6 +134,13 @@ UID_GID="$(id -u):$(id -g)" docker compose up
   Docker, use `--user 0:0` instead: container root maps to your host user. Without it, or
   with your own UID, the emulator stops with `Permission denied (os error 13)`. With Podman,
   use `--userns=keep-id`.
+- **Other containers.** The emulator certificate names only `localhost`, `127.0.0.1` and
+  `::1`. A client in another container that calls `https://aws-emulator:9297` fails TLS
+  validation. Run the client in the network namespace of the emulator instead
+  (`docker run --network container:<emulator> ...` with `https://127.0.0.1:<port>`).
+- **Use `127.0.0.1`, not `localhost`.** With a host name, some SDKs (for example the AWS SDK
+  for JavaScript v3) use virtual-hosted S3 addresses such as `bucket.localhost`, which do not
+  resolve.
 - **No Windows containers.** The emulator runs only on Linux. On Windows, use Linux
   containers (Docker Desktop with WSL 2).
 
