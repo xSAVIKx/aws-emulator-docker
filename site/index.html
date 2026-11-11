@@ -293,14 +293,18 @@ table{width:100%;border-collapse:collapse;font-size:15px;margin:0 0 16px}
 th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 th{color:var(--muted);font-weight:600}
 .tablewrap{overflow-x:auto}
+td:first-child code{white-space:nowrap}
+td code{overflow-wrap:anywhere}
 .warn{border-left:4px solid var(--accent);background:var(--bg-soft);padding:12px 16px;border-radius:0 var(--radius) var(--radius) 0;margin:0 0 16px}
 ul.facts{padding-left:20px;margin:0 0 16px}
 ul.facts li{margin-bottom:8px}
 .releases{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
 details.release{border:1px solid var(--line);border-radius:var(--radius);background:var(--bg-soft)}
-details.release summary{cursor:pointer;padding:12px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;list-style:none}
+details.release summary{cursor:pointer;padding:12px 16px;display:flex;gap:10px;align-items:baseline;flex-wrap:nowrap;list-style:none}
+details.release summary b{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+details.release summary .muted,details.release summary .pill{flex:none;white-space:nowrap}
 details.release summary::-webkit-details-marker{display:none}
-details.release summary::before{content:"\25B8";color:var(--accent);transition:transform .15s}
+details.release summary::before{content:"\25B8";color:var(--accent);transition:transform .15s;flex:none}
 details.release[open] summary::before{transform:rotate(90deg)}
 .pill{background:var(--accent);color:var(--accent-ink);border-radius:999px;font-size:12px;font-weight:700;padding:1px 8px}
 .release-body{padding:0 16px 8px;border-top:1px solid var(--line);overflow-x:auto}
@@ -535,15 +539,15 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
 
 <h3>Inputs</h3>
 <div class="tablewrap"><table>
-  <thead><tr><th>Input</th><th>Default</th><th>Description</th></tr></thead>
+  <thead><tr><th>Input</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>image</code></td><td><code>ghcr.io/xsavikx/aws-emulator:latest</code></td><td>The image. Use a <code>-debian</code> tag for the Debian variant.</td></tr>
-    <tr><td><code>port</code></td><td><code>9297</code></td><td>The port on <code>127.0.0.1</code>. The container uses the same port.</td></tr>
-    <tr><td><code>region</code></td><td><code>us-east-1</code></td><td>The value of <code>AWS_REGION</code> and <code>AWS_DEFAULT_REGION</code>.</td></tr>
-    <tr><td><code>telemetry</code></td><td><code>off</code></td><td>Upstream emulator telemetry, <code>on</code> or <code>off</code>.</td></tr>
-    <tr><td><code>memory</code></td><td><code>2g</code></td><td>The container memory limit.</td></tr>
-    <tr><td><code>wait-timeout</code></td><td><code>60</code></td><td>Seconds to wait until the emulator is healthy.</td></tr>
-    <tr><td><code>pull</code></td><td><code>false</code></td><td>Pull the image before the start.</td></tr>
+    <tr><td><code>image</code></td><td>The image. Use a <code>-debian</code> tag for the Debian variant. Default: <code>ghcr.io/xsavikx/aws-emulator:latest</code>.</td></tr>
+    <tr><td><code>port</code></td><td>The port on <code>127.0.0.1</code>. The container uses the same port. Default: <code>9297</code>.</td></tr>
+    <tr><td><code>region</code></td><td>The value of <code>AWS_REGION</code> and <code>AWS_DEFAULT_REGION</code>. Default: <code>us-east-1</code>.</td></tr>
+    <tr><td><code>telemetry</code></td><td>Upstream emulator telemetry, <code>on</code> or <code>off</code>. Default: <code>off</code>.</td></tr>
+    <tr><td><code>memory</code></td><td>The container memory limit. Default: <code>2g</code>.</td></tr>
+    <tr><td><code>wait-timeout</code></td><td>Seconds to wait until the emulator is healthy. Default: <code>60</code>.</td></tr>
+    <tr><td><code>pull</code></td><td>Pull the image before the start. Default: <code>false</code>.</td></tr>
   </tbody>
 </table></div>
 
