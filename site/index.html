@@ -88,7 +88,7 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding:24px 0 40px;colo
 
 <main class="wrap">
 <section class="hero">
-  <span class="badge">Upstream version <b id="ver">__VERSION__</b> · linux/amd64 · linux/arm64</span>
+  <span class="badge">Upstream version <b id="ver">__VERSION__</b> · linux/amd64 · linux/arm64 · Amazon Linux and Debian</span>
   <h1>The <span>AWS Emulator</span>, ready to run in Docker.</h1>
   <p class="lead">AWS does not publish a prebuilt image of its local AWS API emulator. This project builds one, tests it on both architectures, signs it, and publishes it to three registries. A new upstream release is live within one hour.</p>
   <pre><code>docker run --rm -p 127.0.0.1:9297:9297 ghcr.io/xsavikx/aws-emulator</code><button class="copy" type="button">Copy</button></pre>
@@ -216,6 +216,15 @@ aws sts get-caller-identity</code><button class="copy" type="button">Copy</butto
     <tr><td><code>sha-&lt;commit&gt;</code></td><td>The build from one commit of this repository</td></tr>
   </tbody>
 </table></div>
+<h3>Variants</h3>
+<div class="tablewrap"><table>
+  <thead><tr><th>Variant</th><th>Base image</th><th>Tags</th></tr></thead>
+  <tbody>
+    <tr><td>Amazon Linux (default)</td><td><code>amazonlinux:2023-minimal</code></td><td><code>latest</code>, <code>__VERSION__</code>, ...</td></tr>
+    <tr><td>Debian</td><td><code>debian:trixie-slim</code></td><td><code>debian</code>, <code>latest-debian</code>, <code>__VERSION__-debian</code>, ...</td></tr>
+  </tbody>
+</table></div>
+<p class="muted">Each tag of the default variant has a Debian twin with the <code>-debian</code> suffix. Both install the same upstream emulator, from the <code>.rpm</code> or the <code>.deb</code> package, and both behave the same way.</p>
 
 <h2 id="verify">Verify the image</h2>
 <p>Each image has a keyless cosign signature from GitHub Actions. Use cosign v3 or later. Cosign v2 reports "no signatures found".</p>

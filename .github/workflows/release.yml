@@ -34,25 +34,32 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
       upstream_version: ${{ steps.v.outputs.upstream_version }}
-      sha_amd64: ${{ steps.sha.outputs.sha_amd64 }}
-      sha_arm64: ${{ steps.sha.outputs.sha_arm64 }}
+      rpm_sha_amd64: ${{ steps.sha.outputs.rpm_sha_amd64 }}
+      rpm_sha_arm64: ${{ steps.sha.outputs.rpm_sha_arm64 }}
+      deb_sha_amd64: ${{ steps.sha.outputs.deb_sha_amd64 }}
+      deb_sha_arm64: ${{ steps.sha.outputs.deb_sha_arm64 }}
       publish: ${{ steps.publish.outputs.publish }}
       created: ${{ steps.v.outputs.created }}
-      base_name: ${{ steps.base.outputs.name }}
-      base_digest: ${{ steps.base.outputs.digest }}
+      base_name_amazonlinux: ${{ steps.base.outputs.name_amazonlinux }}
+      base_digest_amazonlinux: ${{ steps.base.outputs.digest_amazonlinux }}
+      base_name_debian: ${{ steps.base.outputs.name_debian }}
+      base_digest_debian: ${{ steps.base.outputs.digest_debian }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Read base image from Dockerfile
+      - name: Read base images from the Dockerfiles
         id: base
         shell: bash
         run: |
           set -euo pipefail
-          ref=$(sed -n 's/^ARG BASE_IMAGE=//p' Dockerfile)
-          echo "name=${ref%@*}" | tee -a "$GITHUB_OUTPUT"
-          echo "digest=${ref#*@}" | tee -a "$GITHUB_OUTPUT"
+          for pair in amazonlinux:Dockerfile debian:Dockerfile.debian; do
+            v=${pair%%:*}; f=${pair#*:}
+            ref=$(sed -n 's/^ARG BASE_IMAGE=//p' "$f")
+            echo "name_$v=${ref%@*}" | tee -a "$GITHUB_OUTPUT"
+            echo "digest_$v=${ref#*@}" | tee -a "$GITHUB_OUTPUT"
+          done
 
       - name: Resolve upstream version
         id: v
@@ -80,8 +87,9 @@ jobs:
           case "$EVENT" in
             push|workflow_dispatch) publish=true ;;
             schedule)
-              if docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM" >/dev/null 2>&1; then
-                echo "$GHCR_IMAGE:$UPSTREAM exists. Nothing to do."
+              if docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM" >/dev/null 2>&1 \
+                && docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM-debian" >/dev/null 2>&1; then
+                echo "$GHCR_IMAGE:$UPSTREAM and :$UPSTREAM-debian exist. Nothing to do."
               else
                 publish=true
               fi ;;
@@ -90,7 +98,7 @@ jobs:
           if [ "$FORCE" = "true" ]; then publish=true; fi
           echo "publish=$publish" | tee -a "$GITHUB_OUTPUT"
 
-      - name: Checksums of the pinned RPMs
+      - name: Checksums of the pinned packages
         id: sha
         if: steps.publish.outputs.publish == 'true' || github.event_name == 'pull_request'
         shell: bash
@@ -98,30 +106,39 @@ jobs:
           UPSTREAM: ${{ steps.v.outputs.upstream_version }}
         run: |
           set -euo pipefail
-          file() { echo "$DOWNLOAD_BASE/aws-emulator-${UPSTREAM%.*}-${UPSTREAM##*.}-$1.rpm"; }
-          sha() { curl -fsSL --retry 5 --retry-all-errors "$(file "$1")" | sha256sum | cut -d' ' -f1; }
-          sha_amd=$(sha x86_64); sha_arm=$(sha aarch64)
-          echo "sha_amd64=$sha_amd" >> "$GITHUB_OUTPUT"
-          echo "sha_arm64=$sha_arm" >> "$GITHUB_OUTPUT"
-          {
-            echo "### Upstream AWS Emulator $UPSTREAM"
-            echo "| file | sha256 |"; echo "|---|---|"
-            echo "| \`$(basename "$(file x86_64)")\` | \`$sha_amd\` |"
-            echo "| \`$(basename "$(file aarch64)")\` | \`$sha_arm\` |"
-          } >> "$GITHUB_STEP_SUMMARY"
+          v="${UPSTREAM%.*}-${UPSTREAM##*.}"
+          sha() { curl -fsSL --retry 5 --retry-all-errors "$DOWNLOAD_BASE/$1" | sha256sum | cut -d' ' -f1; }
+          echo "### Upstream AWS Emulator $UPSTREAM" >> "$GITHUB_STEP_SUMMARY"
+          echo "| file | sha256 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for spec in rpm_sha_amd64:aws-emulator-$v-x86_64.rpm rpm_sha_arm64:aws-emulator-$v-aarch64.rpm \
+                      deb_sha_amd64:aws-emulator_${v}_amd64.deb deb_sha_arm64:aws-emulator_${v}_arm64.deb; do
+            key=${spec%%:*}; file=${spec#*:}
+            h=$(sha "$file")
+            echo "$key=$h" >> "$GITHUB_OUTPUT"
+            echo "| \`$file\` | \`$h\` |" >> "$GITHUB_STEP_SUMMARY"
+          done
 
   build:
-    name: Build ${{ matrix.platform }}
+    name: Build ${{ matrix.variant }} ${{ matrix.platform }}
     needs: resolve
     if: needs.resolve.outputs.publish == 'true' || github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
+        variant: [amazonlinux, debian]
+        platform: [linux/amd64, linux/arm64]
         include:
           - platform: linux/amd64
             runner: ubuntu-24.04
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
+          - variant: amazonlinux
+            dockerfile: Dockerfile
+            title: AWS Emulator
+          - variant: debian
+            dockerfile: Dockerfile.debian
+            title: AWS Emulator (Debian)
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -129,9 +146,10 @@ jobs:
     steps:
       - name: Prepare
         shell: bash
-        run: echo "PLATFORM_PAIR=${PLATFORM//\//-}" >> "$GITHUB_ENV"
+        run: echo "PLATFORM_PAIR=${VARIANT}-${PLATFORM//\//-}" >> "$GITHUB_ENV"
         env:
           PLATFORM: ${{ matrix.platform }}
+          VARIANT: ${{ matrix.variant }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -145,7 +163,7 @@ jobs:
         with:
           images: ${{ env.GHCR_IMAGE }}
           labels: &labels |
-            org.opencontainers.image.title=AWS Emulator
+            org.opencontainers.image.title=${{ matrix.title }}
             org.opencontainers.image.description=Multi-arch container image of the AWS Emulator, a local emulator of the AWS APIs. Unofficial community build.
             org.opencontainers.image.authors=Yurii Serhiichuk <yurii@serhiichuk.dev>
             org.opencontainers.image.vendor=Yurii Serhiichuk
@@ -153,8 +171,8 @@ jobs:
             org.opencontainers.image.created=${{ needs.resolve.outputs.created }}
             org.opencontainers.image.licenses=Apache-2.0 AND CC0-1.0
             org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
-            org.opencontainers.image.base.name=${{ needs.resolve.outputs.base_name }}
-            org.opencontainers.image.base.digest=${{ needs.resolve.outputs.base_digest }}
+            org.opencontainers.image.base.name=${{ needs.resolve.outputs[format('base_name_{0}', matrix.variant)] }}
+            org.opencontainers.image.base.digest=${{ needs.resolve.outputs[format('base_digest_{0}', matrix.variant)] }}
             org.opencontainers.image.url=https://github.com/${{ github.repository }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -169,10 +187,13 @@ jobs:
           load: true
           tags: ${{ env.IMAGE_NAME }}:ci
           labels: ${{ steps.meta.outputs.labels }}
+          file: ${{ matrix.dockerfile }}
           build-args: |
             EMULATOR_VERSION=${{ needs.resolve.outputs.upstream_version }}
-            RPM_SHA256_AMD64=${{ needs.resolve.outputs.sha_amd64 }}
-            RPM_SHA256_ARM64=${{ needs.resolve.outputs.sha_arm64 }}
+            RPM_SHA256_AMD64=${{ needs.resolve.outputs.rpm_sha_amd64 }}
+            RPM_SHA256_ARM64=${{ needs.resolve.outputs.rpm_sha_arm64 }}
+            DEB_SHA256_AMD64=${{ needs.resolve.outputs.deb_sha_amd64 }}
+            DEB_SHA256_ARM64=${{ needs.resolve.outputs.deb_sha_arm64 }}
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
           cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
 
@@ -197,10 +218,13 @@ jobs:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
+          file: ${{ matrix.dockerfile }}
           build-args: |
             EMULATOR_VERSION=${{ needs.resolve.outputs.upstream_version }}
-            RPM_SHA256_AMD64=${{ needs.resolve.outputs.sha_amd64 }}
-            RPM_SHA256_ARM64=${{ needs.resolve.outputs.sha_arm64 }}
+            RPM_SHA256_AMD64=${{ needs.resolve.outputs.rpm_sha_amd64 }}
+            RPM_SHA256_ARM64=${{ needs.resolve.outputs.rpm_sha_arm64 }}
+            DEB_SHA256_AMD64=${{ needs.resolve.outputs.deb_sha_amd64 }}
+            DEB_SHA256_ARM64=${{ needs.resolve.outputs.deb_sha_arm64 }}
           outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           provenance: mode=max
           sbom: true
@@ -225,9 +249,19 @@ jobs:
           retention-days: 1
 
   publish:
-    name: Publish multi-arch manifest
+    name: Publish ${{ matrix.variant }} manifest
     needs: [resolve, build]
     if: needs.resolve.outputs.publish == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: amazonlinux
+            suffix: ""
+            title: AWS Emulator
+          - variant: debian
+            suffix: "-debian"
+            title: AWS Emulator (Debian)
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -237,11 +271,12 @@ jobs:
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+      SUFFIX: ${{ matrix.suffix }}
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-*
+          pattern: digests-${{ matrix.variant }}-*
           merge-multiple: true
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -292,7 +327,9 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: index
         with:
           images: ${{ steps.images.outputs.list }}
-          flavor: latest=false
+          flavor: |
+            latest=false
+            suffix=${{ matrix.suffix }}
           tags: |
             type=raw,value=${{ needs.resolve.outputs.upstream_version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=raw,value=${{ needs.resolve.outputs.version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
@@ -302,6 +339,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=ref,event=tag
             type=sha,format=short,prefix=sha-
+            type=raw,value=debian,suffix=,enable=${{ matrix.variant == 'debian' && (github.ref == 'refs/heads/main' || github.event_name != 'push') }}
           labels: *labels
 
       - name: Create and push manifest lists
@@ -324,8 +362,8 @@ jobs:
           VERSION: ${{ needs.resolve.outputs.upstream_version }}
         run: |
           set -euo pipefail
-          docker buildx imagetools inspect "$GHCR_IMAGE:sha-${GITHUB_SHA::7}"
-          digest=$(docker buildx imagetools inspect "$GHCR_IMAGE:sha-${GITHUB_SHA::7}" --format '{{json .Manifest}}' | jq -r .digest)
+          docker buildx imagetools inspect "$GHCR_IMAGE:sha-${GITHUB_SHA::7}${SUFFIX}"
+          digest=$(docker buildx imagetools inspect "$GHCR_IMAGE:sha-${GITHUB_SHA::7}${SUFFIX}" --format '{{json .Manifest}}' | jq -r .digest)
           echo "digest=$digest" | tee -a "$GITHUB_OUTPUT"
 
       - name: Sign images with cosign (keyless)
@@ -353,7 +391,7 @@ jobs:
           DIGEST: ${{ steps.digest.outputs.digest }}
         run: |
           {
-            echo "### Published"
+            echo "### Published ${{ matrix.variant }}"
             echo "Digest: \`$DIGEST\`"
             jq -r '.tags[] | "- `" + . + "`"' <<<"$TAGS_JSON"
           } >> "$GITHUB_STEP_SUMMARY"

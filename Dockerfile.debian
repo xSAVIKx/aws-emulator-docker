@@ -1,0 +1,103 @@
+# syntax=docker/dockerfile:1.10
+#
+# Debian variant of the AWS Emulator container image
+# (https://github.com/aws/aws-emulator). It installs the upstream .deb package.
+#
+# Maintainer: Yurii Serhiichuk <yurii@serhiichuk.dev>
+# SPDX-License-Identifier: Apache-2.0
+
+ARG BASE_IMAGE=debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
+
+# ---------------------------------------------------------------------------
+# Stage 1: download the .deb for the target architecture and verify it.
+# The package stays out of the final image layers.
+# ---------------------------------------------------------------------------
+FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS fetch
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG TARGETARCH
+# Upstream package version from versions.json, for example 1.0.322.1.
+# Set it to "latest" to use the moving LTS/latest URL.
+ARG EMULATOR_VERSION=1.0.322.1
+ARG EMULATOR_CHANNEL=LTS
+ARG EMULATOR_DOWNLOAD_BASE=https://downloads.aws.com/aws-emulator/packages/aws-emulator
+# AWS package signing key "SSM Publishing <ssm-publishing@amazon.com>".
+# Source: https://downloads.aws.com/keys/gpg/current.asc
+ARG PKG_SIGNER_FINGERPRINT=98BCF336A3BE53B734E967C52E5BF49BD940F624
+# Optional SHA-256 digests. CI sets them. When set, the build fails on a mismatch.
+ARG DEB_SHA256_AMD64=""
+ARG DEB_SHA256_ARM64=""
+# hadolint ignore=DL3008
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && rm -rf /var/lib/apt/lists/*
+COPY keys/aws-emulator-signing-key.asc /keys/aws-emulator-signing-key.asc
+RUN set -eu; \
+    case "${TARGETARCH}" in \
+      amd64|arm64) deb_arch="${TARGETARCH}" ;; \
+      *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    if [ "${TARGETARCH}" = amd64 ]; then want="${DEB_SHA256_AMD64}"; else want="${DEB_SHA256_ARM64}"; fi; \
+    base="${EMULATOR_DOWNLOAD_BASE}/${EMULATOR_CHANNEL}"; \
+    if [ "${EMULATOR_VERSION}" = "latest" ]; then \
+      url="${base}/latest/aws-emulator_${deb_arch}.deb"; \
+    else \
+      url="${base}/aws-emulator_${EMULATOR_VERSION%.*}-${EMULATOR_VERSION##*.}_${deb_arch}.deb"; \
+    fi; \
+    echo "Downloading ${url}"; \
+    curl -fsSL --retry 5 --retry-all-errors -o /aws-emulator.deb "${url}"; \
+    curl -fsSL --retry 5 --retry-all-errors -o /aws-emulator.deb.sig "${url}.sig"; \
+    if [ -n "${want}" ]; then \
+      echo "${want}  /aws-emulator.deb" | sha256sum -c -; \
+    fi; \
+    export GNUPGHOME=/tmp/gnupg; mkdir -m 700 "${GNUPGHOME}"; \
+    gpg --batch --quiet --import /keys/aws-emulator-signing-key.asc; \
+    gpg --batch --with-colons --fingerprint | grep -q "^fpr:::::::::${PKG_SIGNER_FINGERPRINT}:"; \
+    gpg --batch --status-fd 1 --verify /aws-emulator.deb.sig /aws-emulator.deb \
+      | tee /dev/stderr | grep "^\[GNUPG:\] VALIDSIG ${PKG_SIGNER_FINGERPRINT} " >/dev/null; \
+    rm -rf "${GNUPGHOME}"
+
+# ---------------------------------------------------------------------------
+# Stage 2: runtime image.
+# ---------------------------------------------------------------------------
+FROM ${BASE_IMAGE}
+
+ARG EMULATOR_UID=1000
+ARG EMULATOR_GID=1000
+ARG BASE_IMAGE
+
+LABEL org.opencontainers.image.title="AWS Emulator (Debian)" \
+      org.opencontainers.image.description="Multi-arch container image of the AWS Emulator, a local emulator of the AWS APIs, on Debian. Unofficial community build." \
+      org.opencontainers.image.authors="Yurii Serhiichuk <yurii@serhiichuk.dev>" \
+      org.opencontainers.image.vendor="Yurii Serhiichuk" \
+      org.opencontainers.image.url="https://github.com/xSAVIKx/aws-emulator-docker" \
+      org.opencontainers.image.source="https://github.com/xSAVIKx/aws-emulator-docker" \
+      org.opencontainers.image.documentation="https://github.com/xSAVIKx/aws-emulator-docker#readme" \
+      org.opencontainers.image.licenses="Apache-2.0 AND CC0-1.0" \
+      org.opencontainers.image.base.name="${BASE_IMAGE}"
+
+# hadolint ignore=DL3008
+RUN --mount=type=bind,from=fetch,source=/aws-emulator.deb,target=/mnt/pkg/aws-emulator.deb \
+    set -eu; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl /mnt/pkg/aws-emulator.deb; \
+    rm -rf /var/lib/apt/lists/*; \
+    groupadd -g "${EMULATOR_GID}" emulator; \
+    useradd -l -u "${EMULATOR_UID}" -g "${EMULATOR_GID}" -d /home/emulator -s /usr/sbin/nologin emulator; \
+    mkdir -p /home/emulator/.aws/emulator; \
+    chown -R "${EMULATOR_UID}:${EMULATOR_GID}" /home/emulator; \
+    aws-emulator --version
+
+COPY --chmod=0755 healthcheck.sh /usr/local/bin/aws-emulator-healthcheck
+
+USER ${EMULATOR_UID}:${EMULATOR_GID}
+ENV HOME=/home/emulator \
+    EMULATOR_HEALTHCHECK_PORT=9297
+WORKDIR /home/emulator
+
+EXPOSE 9297
+STOPSIGNAL SIGTERM
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["/usr/local/bin/aws-emulator-healthcheck"]
+
+ENTRYPOINT ["aws-emulator", "-b", "0.0.0.0"]

@@ -39,6 +39,18 @@ Podman, containerd and Kubernetes on Linux run them natively.
 | `1.0`, `1` | The newest release in that line |
 | `sha-<commit>` | The build from one commit of this repository |
 
+### Variants
+
+| Variant | Base image | Tags |
+|---|---|---|
+| Amazon Linux (default) | `amazonlinux:2023-minimal` | `latest`, `1.0.322.1`, ... |
+| Debian | `debian:trixie-slim` (Debian 13) | `debian`, `latest-debian`, `1.0.322.1-debian`, `1.0-debian`, ... |
+
+Each tag of the default variant has a Debian twin with the `-debian` suffix. Both variants
+install the same upstream emulator: the Amazon Linux variant from the `.rpm` package, the
+Debian variant from the `.deb` package. Both have the same entry point, user, port and
+health check. Use the Debian variant if your tooling expects `apt` and Debian.
+
 For reproducible builds, pin the image by digest.
 
 ## Quick start
@@ -161,13 +173,14 @@ gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx
 
 ```sh
 docker buildx build --platform linux/amd64,linux/arm64 -t aws-emulator .
+docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile.debian -t aws-emulator:debian .
 ```
 
 The Dockerfile downloads the pinned LTS RPM for each target architecture and checks its
-signature. To build another version, pass `--build-arg EMULATOR_VERSION=<version>` with a
+signature (the Debian variant checks the detached `.sig` file with `gpg`). To build another version, pass `--build-arg EMULATOR_VERSION=<version>` with a
 version from
 [`versions.json`](https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/versions.json),
-or `latest`. Pass `--build-arg RPM_SHA256_AMD64=<sha>` and `--build-arg RPM_SHA256_ARM64=<sha>`
+or `latest`. Pass `--build-arg RPM_SHA256_AMD64=<sha>` and `--build-arg RPM_SHA256_ARM64=<sha>` (`DEB_SHA256_*` for Debian)
 to also check the SHA-256 digests. Run the tests with `tests/smoke.sh aws-emulator`.
 
 ## Licenses
@@ -176,7 +189,7 @@ to also check the SHA-256 digests. Run the tests with `tests/smoke.sh aws-emulat
   Copyright 2026 Yurii Serhiichuk.
 - The AWS Emulator: CC0 1.0 Universal, with code in its `vendor/` directory under the
   Apache License 2.0. See [aws/aws-emulator](https://github.com/aws/aws-emulator).
-- Amazon Linux 2023 base image: see its package licenses.
+- Amazon Linux 2023 and Debian base images: see their package licenses.
 
 ## Author
 
