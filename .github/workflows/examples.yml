@@ -76,8 +76,9 @@ jobs:
         with:
           global-json-file: examples/dotnet/global.json
 
-      - name: Start AWS Emulator
-        uses: ./.github/actions/aws-emulator
+      - name: Run AWS Emulator
+        id: emulator
+        uses: xSAVIKx/run-aws-emulator@v1
         with:
           image: ${{ inputs.image || 'ghcr.io/xsavikx/aws-emulator:latest' }}
 
@@ -86,4 +87,4 @@ jobs:
 
       - name: Emulator logs
         if: failure()
-        run: docker logs aws-emulator-9297
+        run: docker logs "${{ steps.emulator.outputs.container }}"

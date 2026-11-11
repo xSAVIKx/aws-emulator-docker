@@ -290,10 +290,10 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
 <pre><code>examples/with-emulator.sh examples/rust/run-tests.sh</code><button class="copy" type="button">Copy</button></pre>
 </div>
 <h3>Use it in GitHub Actions</h3>
-<p>The repository has a composite action. It starts the emulator, waits until it is healthy, and sets the SDK environment for the next steps.</p>
+<p>The <a href="https://github.com/xSAVIKx/run-aws-emulator">Run AWS Emulator</a> action starts the emulator, waits until it is healthy, and sets the SDK environment for the next steps. It works on amd64 and arm64 runners.</p>
 <pre><code>steps:
   - uses: actions/checkout@v5
-  - uses: xSAVIKx/aws-emulator-docker/.github/actions/aws-emulator@main
+  - uses: xSAVIKx/run-aws-emulator@v1
     with:
       image: ghcr.io/xsavikx/aws-emulator:latest
   - run: aws sts get-caller-identity   # then run your own tests</code><button class="copy" type="button">Copy</button></pre>

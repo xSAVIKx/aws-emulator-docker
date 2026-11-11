@@ -120,11 +120,11 @@ UID_GID="$(id -u):$(id -g)" docker compose up
 - [`examples/`](examples/) has integration tests in Python (pytest), TypeScript (Vitest),
   Java (JUnit 5), Go (`go test`), C# (xUnit) and Rust (`cargo test`). They cover STS, S3,
   DynamoDB, SQS, SNS to SQS and Secrets Manager. CI runs them on amd64 and arm64.
-- [`.github/actions/aws-emulator`](.github/actions/aws-emulator/action.yml) starts the
-  emulator in your own workflow and sets the SDK environment:
+- The [Run AWS Emulator](https://github.com/xSAVIKx/run-aws-emulator) GitHub Action starts
+  the emulator in your own workflow and sets the SDK environment:
 
   ```yaml
-  - uses: xSAVIKx/aws-emulator-docker/.github/actions/aws-emulator@main
+  - uses: xSAVIKx/run-aws-emulator@v1
   - run: aws sts get-caller-identity
   ```
 

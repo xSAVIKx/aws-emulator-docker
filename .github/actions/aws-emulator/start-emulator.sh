@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Start the AWS Emulator container and print the environment for AWS SDKs.
+# The maintained copy is in https://github.com/xSAVIKx/run-aws-emulator.
 #
 # Local use (prints "export" lines; evaluate them in your shell):
 #   eval "$(.github/actions/aws-emulator/start-emulator.sh)"

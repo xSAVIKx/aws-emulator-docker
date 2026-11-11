@@ -78,9 +78,9 @@ Two rules apply in every language:
 ```yaml
 steps:
   - uses: actions/checkout@v5
-  - uses: xSAVIKx/aws-emulator-docker/.github/actions/aws-emulator@main
+  - uses: xSAVIKx/run-aws-emulator@v1
   - run: aws sts get-caller-identity   # and then your own tests
 ```
 
-Pin the action to a commit SHA and the image to a build tag or digest for reproducible
-runs. The action inputs are `image`, `port`, `region`, `telemetry` and `memory`.
+The action is [xSAVIKx/run-aws-emulator](https://github.com/xSAVIKx/run-aws-emulator).
+Pin the image to a build tag or a digest for reproducible runs.

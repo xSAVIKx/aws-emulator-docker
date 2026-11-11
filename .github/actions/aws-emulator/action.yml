@@ -1,6 +1,6 @@
 name: AWS Emulator
 description: >-
-  Start the AWS Emulator (https://github.com/aws/aws-emulator) in Docker and point the
+  Deprecated path. Use xSAVIKx/run-aws-emulator@v1. Start the AWS Emulator (https://github.com/aws/aws-emulator) in Docker and point the
   AWS CLI and SDKs at it. Unofficial community action.
 author: Yurii Serhiichuk
 branding:
@@ -38,12 +38,13 @@ outputs:
 runs:
   using: composite
   steps:
+    # The action moved to its own repository: https://github.com/xSAVIKx/run-aws-emulator
+    # This path stays as a thin wrapper for workflows that already use it.
     - id: start
-      shell: bash
-      env:
-        EMULATOR_IMAGE: ${{ inputs.image }}
-        EMULATOR_PORT: ${{ inputs.port }}
-        EMULATOR_REGION: ${{ inputs.region }}
-        EMULATOR_TELEMETRY: ${{ inputs.telemetry }}
-        EMULATOR_MEMORY: ${{ inputs.memory }}
-      run: '"$GITHUB_ACTION_PATH/start-emulator.sh" --github-env'
+      uses: xSAVIKx/run-aws-emulator@v1
+      with:
+        image: ${{ inputs.image }}
+        port: ${{ inputs.port }}
+        region: ${{ inputs.region }}
+        telemetry: ${{ inputs.telemetry }}
+        memory: ${{ inputs.memory }}
