@@ -15,6 +15,9 @@ AWS does not publish a prebuilt image. The
 tells you to build one yourself. This project builds that image, tests it, signs it, and
 publishes it for you. A scheduled workflow checks for a new upstream release every hour.
 
+Write-up with `docker run`, Compose, GitHub Actions and the gotchas:
+[Running AWS Emulator in Docker, on any arch, in CI](https://serhiichuk.dev/blog/aws-emulator-container-image/)
+
 > This is an unofficial community project. It is not affiliated with or endorsed by
 > Amazon Web Services.
 

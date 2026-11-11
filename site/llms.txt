@@ -45,6 +45,7 @@ aws sts get-caller-identity   # Account 000000000000
 - [Website](https://xsavikx.github.io/aws-emulator-docker/): quick start, facts, examples, action, tags, verification, FAQ, release notes
 - [Source repository](https://github.com/xSAVIKx/aws-emulator-docker): Dockerfiles, CI, tests
 - [Examples](https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples): Python pytest, TypeScript Vitest, Java JUnit 5, Go, C# xUnit, Rust
+- [Running AWS Emulator in Docker, on any arch, in CI](https://serhiichuk.dev/blog/aws-emulator-container-image/): write-up with docker run, Compose, GitHub Actions and the gotchas
 - [Releases](https://github.com/xSAVIKx/aws-emulator-docker/releases): image digests and upstream changes per version
 - [Action source](https://github.com/xSAVIKx/run-aws-emulator)
 
