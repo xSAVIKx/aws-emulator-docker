@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AWS Emulator Docker Image</title>
+<meta name="description" content="Multi-arch (amd64/arm64) container image of the AWS Emulator, a local emulator of the AWS APIs. Signed, tested, and published to GHCR, Docker Hub and Quay.io.">
+<meta name="author" content="Yurii Serhiichuk">
+<meta property="og:title" content="AWS Emulator Docker Image">
+<meta property="og:description" content="Run the AWS Emulator in one command on Linux, macOS and Windows. amd64 and arm64. Signed, with SBOM and provenance.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://xsavikx.github.io/aws-emulator-docker/">
+<link rel="canonical" href="https://xsavikx.github.io/aws-emulator-docker/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff9900'/%3E%3Cpath d='M7 13h18v10H7z M10 9h12v4H10z' fill='%23141a22'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#ffffff;--bg-soft:#f5f7fa;--fg:#141a22;--muted:#5a6573;--line:#e3e8ef;
+  --accent:#e68a00;--accent-ink:#141a22;--code-bg:#0f1720;--code-fg:#e6edf3;--ok:#1a7f37;
+  --radius:12px;--max:980px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117;--bg-soft:#151b23;--fg:#e6edf3;--muted:#9aa6b2;--line:#262f3a;
+    --accent:#ff9f1c;--accent-ink:#0d1117;--code-bg:#010409;--code-fg:#e6edf3;--ok:#3fb950;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117;--bg-soft:#151b23;--fg:#e6edf3;--muted:#9aa6b2;--line:#262f3a;
+  --accent:#ff9f1c;--accent-ink:#0d1117;--code-bg:#010409;--code-fg:#e6edf3;--ok:#3fb950;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:3px}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 16px}
+header.top{border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;height:56px;gap:12px}
+.brand{font-weight:700;text-decoration:none;display:flex;align-items:center;gap:8px}
+.brand i{width:22px;height:22px;border-radius:6px;background:var(--accent);display:inline-block}
+nav a{margin-left:16px;color:var(--muted);text-decoration:none;font-size:15px}
+nav a:hover{color:var(--fg)}
+.hero{padding:56px 0 32px}
+.badge{display:inline-block;font-size:13px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin-bottom:16px}
+h1{font-size:clamp(30px,5vw,46px);line-height:1.1;margin:0 0 16px;letter-spacing:-.02em}
+h1 span{color:var(--accent)}
+.lead{font-size:18px;color:var(--muted);max-width:680px;margin:0 0 28px}
+h2{font-size:26px;margin:56px 0 12px;letter-spacing:-.01em}
+h3{font-size:18px;margin:24px 0 8px}
+p{margin:0 0 14px}
+.muted{color:var(--muted)}
+pre{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:var(--radius);padding:16px 18px;overflow-x:auto;font:13.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:0 0 16px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+:not(pre)>code{background:var(--bg-soft);border:1px solid var(--line);border-radius:6px;padding:1px 5px}
+.copy{position:absolute;top:8px;right:8px;background:transparent;color:var(--code-fg);border:1px solid #3a4552;border-radius:8px;font-size:12px;padding:3px 9px;cursor:pointer;opacity:.85}
+.copy:hover{opacity:1;border-color:var(--accent)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.tabs button{background:var(--bg-soft);color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font:inherit;font-size:14px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--accent-ink);background:var(--accent);border-color:var(--accent);font-weight:600}
+.panel[hidden]{display:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.card{border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;background:var(--bg-soft)}
+.card b{display:block;margin-bottom:4px}
+.card p{margin:0;color:var(--muted);font-size:15px}
+table{width:100%;border-collapse:collapse;font-size:15px;margin:0 0 16px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600}
+.tablewrap{overflow-x:auto}
+.warn{border-left:4px solid var(--accent);background:var(--bg-soft);padding:12px 16px;border-radius:0 var(--radius) var(--radius) 0;margin:0 0 16px}
+ul.facts{padding-left:20px;margin:0 0 16px}
+ul.facts li{margin-bottom:8px}
+footer{border-top:1px solid var(--line);margin-top:64px;padding:24px 0 40px;color:var(--muted);font-size:14px}
+.btns{display:flex;gap:10px;flex-wrap:wrap}
+.btn{display:inline-block;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600;border:1px solid var(--line)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+@media (max-width:600px){nav a:not(.gh){display:none}.hero{padding-top:36px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="#"><i aria-hidden="true"></i>aws-emulator-docker</a>
+  <nav>
+    <a href="#quick-start">Quick start</a>
+    <a href="#images">Images</a>
+    <a href="#verify">Verify</a>
+    <a class="gh" href="https://github.com/xSAVIKx/aws-emulator-docker">GitHub</a>
+  </nav>
+</div></header>
+
+<main class="wrap">
+<section class="hero">
+  <span class="badge">Upstream version <b id="ver">__VERSION__</b> · linux/amd64 · linux/arm64</span>
+  <h1>The <span>AWS Emulator</span>, ready to run in Docker.</h1>
+  <p class="lead">AWS does not publish a prebuilt image of its local AWS API emulator. This project builds one, tests it on both architectures, signs it, and publishes it to three registries. A new upstream release is live within one hour.</p>
+  <pre><code>docker run --rm -p 127.0.0.1:9297:9297 ghcr.io/xsavikx/aws-emulator</code><button class="copy" type="button">Copy</button></pre>
+  <div class="btns">
+    <a class="btn primary" href="#quick-start">Quick start</a>
+    <a class="btn" href="https://github.com/xSAVIKx/aws-emulator-docker">Source on GitHub</a>
+  </div>
+</section>
+
+<div class="grid">
+  <div class="card"><b>Multi-arch</b><p>Native amd64 and arm64 builds. Runs on Linux, on macOS (Intel and Apple silicon) and on Windows with Docker Desktop.</p></div>
+  <div class="card"><b>Verified upstream</b><p>A pinned upstream version, with an SHA-256 check and an RPM signature check against the AWS signing key.</p></div>
+  <div class="card"><b>Signed</b><p>Keyless cosign signature, SBOM, SLSA provenance and a GitHub artifact attestation.</p></div>
+  <div class="card"><b>Tested</b><p>Each build runs STS and S3 calls and a health check on both architectures before it is published.</p></div>
+</div>
+
+<h2 id="quick-start">Quick start</h2>
+<p>The emulator writes its credentials, configuration and TLS certificate to <code>~/.aws/emulator/&lt;port&gt;/</code>. Mount that directory, so your AWS CLI and SDKs can read the files.</p>
+<p><b>Step 1.</b> Create the directory. <b>Step 2.</b> Start the emulator.</p>
+<div class="tabs" role="tablist" data-group="run">
+  <button role="tab" aria-selected="true" data-panel="linux">Linux / macOS</button>
+  <button role="tab" aria-selected="false" data-panel="rootless">Rootless Docker</button>
+  <button role="tab" aria-selected="false" data-panel="windows">Windows PowerShell</button>
+  <button role="tab" aria-selected="false" data-panel="compose">Docker Compose</button>
+</div>
+<div class="panel" data-group="run" data-name="linux">
+<pre><code>mkdir -p ~/.aws/emulator
+PORT=9297
+docker run --rm --memory=2g --memory-swap=2g -p 127.0.0.1:$PORT:$PORT \
+  --user "$(id -u):$(id -g)" \
+  -e HOME="$HOME" -v "$HOME/.aws/emulator:$HOME/.aws/emulator" \
+  ghcr.io/xsavikx/aws-emulator -p $PORT</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<div class="panel" data-group="run" data-name="rootless" hidden>
+<p class="muted">With rootless Docker, container root maps to your host user. Your own UID, or no <code>--user</code>, fails with <code>Permission denied (os error 13)</code>.</p>
+<pre><code>mkdir -p ~/.aws/emulator
+PORT=9297
+docker run --rm --memory=2g --memory-swap=2g -p 127.0.0.1:$PORT:$PORT \
+  --user 0:0 \
+  -e HOME="$HOME" -v "$HOME/.aws/emulator:$HOME/.aws/emulator" \
+  ghcr.io/xsavikx/aws-emulator -p $PORT</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<div class="panel" data-group="run" data-name="windows" hidden>
+<pre><code>New-Item -ItemType Directory -Force "$env:USERPROFILE\.aws\emulator"
+$port = 9297
+docker run --rm --memory=2g --memory-swap=2g -p "127.0.0.1:${port}:${port}" `
+  -v "$env:USERPROFILE\.aws\emulator:/home/emulator/.aws/emulator" `
+  ghcr.io/xsavikx/aws-emulator -p $port</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<div class="panel" data-group="run" data-name="compose" hidden>
+<pre><code>services:
+  aws-emulator:
+    image: ghcr.io/xsavikx/aws-emulator:latest
+    command: ["-p", "9297"]
+    user: "${UID_GID:-1000:1000}"
+    environment:
+      HOME: ${HOME}
+    ports:
+      - "127.0.0.1:9297:9297"
+    volumes:
+      - ${HOME}/.aws/emulator:${HOME}/.aws/emulator
+    mem_limit: 2g
+    memswap_limit: 2g</code><button class="copy" type="button">Copy</button></pre>
+<p class="muted">Start it with <code>UID_GID="$(id -u):$(id -g)" docker compose up</code>.</p>
+</div>
+
+<p><b>Step 3.</b> Point the AWS CLI or an SDK at the emulator.</p>
+<div class="tabs" role="tablist" data-group="env">
+  <button role="tab" aria-selected="true" data-panel="bash">Bash / zsh</button>
+  <button role="tab" aria-selected="false" data-panel="pwsh">PowerShell</button>
+</div>
+<div class="panel" data-group="env" data-name="bash">
+<pre><code>export AWS_ENDPOINT_URL=https://127.0.0.1:9297
+export AWS_SHARED_CREDENTIALS_FILE=~/.aws/emulator/9297/emulator_credentials
+export AWS_CONFIG_FILE=~/.aws/emulator/9297/config
+export AWS_CA_BUNDLE=~/.aws/emulator/9297/ca.pem
+export AWS_EC2_METADATA_DISABLED=true
+export AWS_DISABLE_HOST_PREFIX_INJECTION=true
+export AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_PROFILE
+
+aws sts get-caller-identity   # "Account": "000000000000"</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<div class="panel" data-group="env" data-name="pwsh" hidden>
+<pre><code>$env:AWS_ENDPOINT_URL = "https://127.0.0.1:9297"
+$env:AWS_SHARED_CREDENTIALS_FILE = "$env:USERPROFILE\.aws\emulator\9297\emulator_credentials"
+$env:AWS_CONFIG_FILE = "$env:USERPROFILE\.aws\emulator\9297\config"
+$env:AWS_CA_BUNDLE = "$env:USERPROFILE\.aws\emulator\9297\ca.pem"
+$env:AWS_EC2_METADATA_DISABLED = "true"
+$env:AWS_DISABLE_HOST_PREFIX_INJECTION = "true"
+$env:AWS_REGION = "us-east-1"
+$env:AWS_DEFAULT_REGION = "us-east-1"
+
+aws sts get-caller-identity</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<p class="muted">Node.js needs <code>NODE_EXTRA_CA_CERTS</code>. Rust and .NET need <code>SSL_CERT_FILE</code>. Java needs <code>truststore.p12</code>. See the <a href="https://docs.aws.amazon.com/emulator/latest/userguide/point-sdk-to-emulator.html">AWS SDK guide</a>.</p>
+
+<h2>Important facts</h2>
+<div class="warn">Always publish the port on <code>127.0.0.1</code>. The image binds to <code>0.0.0.0</code> inside the container, so a plain <code>-p 9297:9297</code> exposes the emulator to your whole network.</div>
+<ul class="facts">
+  <li><b>Same port in three places.</b> If you change the port, change the host side of <code>-p</code>, the container side of <code>-p</code>, and the emulator <code>-p</code> argument. Do not use <code>-p 0</code>.</li>
+  <li><b>TLS.</b> The emulator creates a new self-signed certificate (<code>ca.pem</code>) at each start. Your client must trust that file.</li>
+  <li><b>Memory.</b> Give the container 2 GiB. Above the limit, Docker stops it with exit code 137, and you lose all emulated resources.</li>
+  <li><b>No persistence.</b> All state is in memory. A restart gives an empty emulator.</li>
+  <li><b>Health check.</b> The image has a Docker <code>HEALTHCHECK</code> on <code>/__admin/health</code>. For another port, also set <code>-e EMULATOR_HEALTHCHECK_PORT=&lt;port&gt;</code>.</li>
+  <li><b>Telemetry.</b> The upstream emulator sends anonymous usage telemetry by default. To turn it off, add <code>-e EMULATOR_TELEMETRY=off</code>.</li>
+</ul>
+
+<h2 id="images">Images and tags</h2>
+<div class="tablewrap"><table>
+  <thead><tr><th>Registry</th><th>Image</th></tr></thead>
+  <tbody>
+    <tr><td>GitHub Container Registry</td><td><code>ghcr.io/xsavikx/aws-emulator</code></td></tr>
+    <tr><td>Docker Hub</td><td><code>docker.io/xsavikx/aws-emulator</code></td></tr>
+    <tr><td>Quay.io</td><td><code>quay.io/xsavikx/aws-emulator</code></td></tr>
+  </tbody>
+</table></div>
+<div class="tablewrap"><table>
+  <thead><tr><th>Tag</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>latest</code>, <code>lts</code></td><td>The newest LTS release</td></tr>
+    <tr><td><code id="ver-full">__VERSION__</code></td><td>The exact upstream package version</td></tr>
+    <tr><td><code id="ver-short">__VERSION_SHORT__</code></td><td>The emulator version, as <code>aws-emulator --version</code> reports it</td></tr>
+    <tr><td><code>1.0</code>, <code>1</code></td><td>The newest release in that line</td></tr>
+    <tr><td><code>sha-&lt;commit&gt;</code></td><td>The build from one commit of this repository</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="verify">Verify the image</h2>
+<p>Each image has a keyless cosign signature from GitHub Actions. Use cosign v3 or later. Cosign v2 reports "no signatures found".</p>
+<pre><code>cosign verify ghcr.io/xsavikx/aws-emulator:latest \
+  --certificate-identity-regexp '^https://github.com/xSAVIKx/aws-emulator-docker/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com</code><button class="copy" type="button">Copy</button></pre>
+<pre><code>gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx</code><button class="copy" type="button">Copy</button></pre>
+<p class="muted">The build checks the upstream RPM against the AWS package signing key, <code>SSM Publishing &lt;ssm-publishing@amazon.com&gt;</code>, fingerprint <code>98BC F336 A3BE 53B7 34E9 67C5 2E5B F49B D940 F624</code>. The base image is pinned by digest.</p>
+
+<h2>Licenses</h2>
+<p>The files in this repository are under the Apache License 2.0. The AWS Emulator is under CC0 1.0 Universal, with its <code>vendor/</code> code under the Apache License 2.0. This is an unofficial community project. It is not affiliated with or endorsed by Amazon Web Services.</p>
+</main>
+
+<footer><div class="wrap">
+  Created and maintained by <a href="https://serhiichuk.dev">Yurii Serhiichuk</a> (<a href="https://github.com/xSAVIKx">@xSAVIKx</a>).
+  Source: <a href="https://github.com/xSAVIKx/aws-emulator-docker">xSAVIKx/aws-emulator-docker</a>.
+  Upstream: <a href="https://github.com/aws/aws-emulator">aws/aws-emulator</a>.
+</div></footer>
+
+<script>
+document.querySelectorAll('.tabs').forEach(function (bar) {
+  var group = bar.getAttribute('data-group');
+  bar.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    bar.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-selected', x === b ? 'true' : 'false'); });
+    document.querySelectorAll('.panel[data-group="' + group + '"]').forEach(function (p) {
+      p.hidden = p.getAttribute('data-name') !== b.getAttribute('data-panel');
+    });
+  });
+});
+document.querySelectorAll('.copy').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var text = btn.parentElement.querySelector('code').innerText;
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, function () {}); }
+  });
+});
+</script>
+</body>
+</html>
