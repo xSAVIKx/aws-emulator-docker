@@ -34,19 +34,15 @@ concurrency:
 
 jobs:
   test:
-    name: ${{ matrix.lang }} (${{ matrix.arch }})
+    name: ${{ matrix.lang }} on ${{ matrix.os }}${{ matrix.arch }}
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     strategy:
       fail-fast: false
       matrix:
         lang: [python, typescript, java, go, dotnet, rust]
-        arch: [amd64, arm64]
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runner }}
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04]
+        arch: ["", "-arm"]
+    runs-on: ${{ matrix.os }}${{ matrix.arch }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
