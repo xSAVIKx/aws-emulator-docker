@@ -34,6 +34,7 @@ Podman, containerd and Kubernetes on Linux run them natively.
 | Tag | Meaning |
 |---|---|
 | `latest`, `lts` | The newest LTS release |
+| `1.0.322.1-<yyyymmdd>.<run>` | One build. This tag never moves. |
 | `1.0.322.1` | The exact upstream package version |
 | `1.0.322` | The emulator version (as `aws-emulator --version` reports it) |
 | `1.0`, `1` | The newest release in that line |
@@ -51,7 +52,9 @@ install the same upstream emulator: the Amazon Linux variant from the `.rpm` pac
 Debian variant from the `.deb` package. Both have the same entry point, user, port and
 health check. Use the Debian variant if your tooling expects `apt` and Debian.
 
-For reproducible builds, pin the image by digest.
+The version tags move when the image is rebuilt (for example for a base image fix). For
+reproducible builds, pin a build tag or a digest. Each build is listed in the
+[releases](https://github.com/xSAVIKx/aws-emulator-docker/releases).
 
 ## Quick start
 

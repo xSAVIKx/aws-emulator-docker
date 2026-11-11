@@ -72,6 +72,19 @@ th{color:var(--muted);font-weight:600}
 .warn{border-left:4px solid var(--accent);background:var(--bg-soft);padding:12px 16px;border-radius:0 var(--radius) var(--radius) 0;margin:0 0 16px}
 ul.facts{padding-left:20px;margin:0 0 16px}
 ul.facts li{margin-bottom:8px}
+.releases{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+details.release{border:1px solid var(--line);border-radius:var(--radius);background:var(--bg-soft)}
+details.release summary{cursor:pointer;padding:12px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;list-style:none}
+details.release summary::-webkit-details-marker{display:none}
+details.release summary::before{content:"\25B8";color:var(--accent);transition:transform .15s}
+details.release[open] summary::before{transform:rotate(90deg)}
+.pill{background:var(--accent);color:var(--accent-ink);border-radius:999px;font-size:12px;font-weight:700;padding:1px 8px}
+.release-body{padding:0 16px 8px;border-top:1px solid var(--line);overflow-x:auto}
+.release-body h3{font-size:16px;margin:18px 0 8px}
+.release-body table{font-size:13.5px}
+.release-body td code{word-break:break-all}
+.release-body ul{padding-left:20px;font-size:14px}
+.release-body pre{padding-top:16px}
 footer{border-top:1px solid var(--line);margin-top:64px;padding:24px 0 40px;color:var(--muted);font-size:14px}
 .btns{display:flex;gap:10px;flex-wrap:wrap}
 .btn{display:inline-block;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600;border:1px solid var(--line)}
@@ -86,6 +99,7 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding:24px 0 40px;colo
     <a href="#quick-start">Quick start</a>
     <a href="#images">Images</a>
     <a href="#verify">Verify</a>
+    <a href="#releases">Releases</a>
     <a class="gh" href="https://github.com/xSAVIKx/aws-emulator-docker">GitHub</a>
   </nav>
 </div></header>
@@ -214,6 +228,7 @@ aws sts get-caller-identity</code><button class="copy" type="button">Copy</butto
   <thead><tr><th>Tag</th><th>Meaning</th></tr></thead>
   <tbody>
     <tr><td><code>latest</code>, <code>lts</code></td><td>The newest LTS release</td></tr>
+    <tr><td><code>__VERSION__-&lt;yyyymmdd&gt;.&lt;run&gt;</code></td><td>One build. This tag never moves. Use it, or a digest, to pin.</td></tr>
     <tr><td><code id="ver-full">__VERSION__</code></td><td>The exact upstream package version</td></tr>
     <tr><td><code id="ver-short">__VERSION_SHORT__</code></td><td>The emulator version, as <code>aws-emulator --version</code> reports it</td></tr>
     <tr><td><code>1.0</code>, <code>1</code></td><td>The newest release in that line</td></tr>
@@ -237,6 +252,12 @@ aws sts get-caller-identity</code><button class="copy" type="button">Copy</butto
   --certificate-oidc-issuer https://token.actions.githubusercontent.com</code><button class="copy" type="button">Copy</button></pre>
 <pre><code>gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx</code><button class="copy" type="button">Copy</button></pre>
 <p class="muted">The build checks the upstream RPM against the AWS package signing key, <code>SSM Publishing &lt;ssm-publishing@amazon.com&gt;</code>, fingerprint <code>98BC F336 A3BE 53B7 34E9 67C5 2E5B F49B D940 F624</code>. The base image is pinned by digest.</p>
+
+<h2 id="releases">Release notes</h2>
+<p>Each new upstream version gets a release, with the image digests, the verified upstream packages and a summary of the upstream changes. <a href="https://github.com/xSAVIKx/aws-emulator-docker/releases.atom">Subscribe with the Atom feed</a>, or watch the repository on GitHub for releases.</p>
+<div class="releases">
+<!-- RELEASES -->
+</div>
 
 <h2>Licenses</h2>
 <p>The files in this repository are under the Apache License 2.0. The AWS Emulator is under CC0 1.0 Universal, with its <code>vendor/</code> code under the Apache License 2.0. This is an unofficial community project. It is not affiliated with or endorsed by Amazon Web Services.</p>

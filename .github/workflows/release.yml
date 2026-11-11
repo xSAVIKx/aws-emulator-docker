@@ -3,7 +3,6 @@ name: Build and publish
 on:
   push:
     branches: [main]
-    tags: ["v*"]
     paths-ignore:
       - "site/**"
       - "**.md"
@@ -46,6 +45,7 @@ jobs:
       deb_sha_arm64: ${{ steps.sha.outputs.deb_sha_arm64 }}
       publish: ${{ steps.publish.outputs.publish }}
       created: ${{ steps.v.outputs.created }}
+      build_tag: ${{ steps.v.outputs.build_tag }}
       base_name_amazonlinux: ${{ steps.base.outputs.name_amazonlinux }}
       base_digest_amazonlinux: ${{ steps.base.outputs.digest_amazonlinux }}
       base_name_debian: ${{ steps.base.outputs.name_debian }}
@@ -79,6 +79,8 @@ jobs:
           echo "upstream_version=$upstream" | tee -a "$GITHUB_OUTPUT"
           echo "version=$(cut -d. -f1-3 <<<"$upstream")" | tee -a "$GITHUB_OUTPUT"
           echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          # Immutable tag: one per build, never moved.
+          echo "build_tag=$upstream-$(date -u +%Y%m%d).$GITHUB_RUN_NUMBER" | tee -a "$GITHUB_OUTPUT"
 
       - name: Decide whether to publish
         id: publish
@@ -337,13 +339,13 @@ jobs:
             latest=false
             suffix=${{ matrix.suffix }}
           tags: |
+            type=raw,value=${{ needs.resolve.outputs.build_tag }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=raw,value=${{ needs.resolve.outputs.upstream_version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=raw,value=${{ needs.resolve.outputs.version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.resolve.outputs.version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=semver,pattern={{major}},value=${{ needs.resolve.outputs.version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=raw,value=lts,enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
-            type=ref,event=tag
             type=sha,format=short,prefix=sha-
             type=raw,value=debian,suffix=,enable=${{ matrix.variant == 'debian' && (github.ref == 'refs/heads/main' || github.event_name != 'push') }}
           labels: *labels
@@ -401,6 +403,93 @@ jobs:
             echo "Digest: \`$DIGEST\`"
             jq -r '.tags[] | "- `" + . + "`"' <<<"$TAGS_JSON"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: GitHub release notes
+    needs: [resolve, publish]
+    if: needs.resolve.outputs.publish == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      UPSTREAM: ${{ needs.resolve.outputs.upstream_version }}
+      VERSION: ${{ needs.resolve.outputs.version }}
+      BUILD_TAG: ${{ needs.resolve.outputs.build_tag }}
+      CREATED: ${{ needs.resolve.outputs.created }}
+      RPM_AMD64: ${{ needs.resolve.outputs.rpm_sha_amd64 }}
+      RPM_ARM64: ${{ needs.resolve.outputs.rpm_sha_arm64 }}
+      DEB_AMD64: ${{ needs.resolve.outputs.deb_sha_amd64 }}
+      DEB_ARM64: ${{ needs.resolve.outputs.deb_sha_arm64 }}
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Write release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest() { docker buildx imagetools inspect "$GHCR_IMAGE:$1" --format '{{json .Manifest}}' | jq -r .digest; }
+          d_al=$(digest "$BUILD_TAG"); d_deb=$(digest "$BUILD_TAG-debian")
+          v="${UPSTREAM%.*}-${UPSTREAM##*.}"
+          upstream_url="https://github.com/aws/aws-emulator/releases/tag/v$VERSION"
+          upstream_notes=$(gh api "repos/aws/aws-emulator/releases/tags/v$VERSION" -q .body 2>/dev/null || true)
+          n_changes=$(grep -c '^- ' <<<"$upstream_notes" || true)
+          {
+            echo "AWS Emulator **$UPSTREAM** (emulator \`$VERSION\`), built $CREATED."
+            echo
+            echo "### Images"
+            echo
+            echo "| Variant | Pull | Immutable tag | Digest |"
+            echo "|---|---|---|---|"
+            echo "| Amazon Linux | \`docker pull ghcr.io/xsavikx/aws-emulator:$UPSTREAM\` | \`$BUILD_TAG\` | \`$d_al\` |"
+            echo "| Debian | \`docker pull ghcr.io/xsavikx/aws-emulator:$UPSTREAM-debian\` | \`$BUILD_TAG-debian\` | \`$d_deb\` |"
+            echo
+            echo "The same tags are on \`docker.io/xsavikx/aws-emulator\` and \`quay.io/xsavikx/aws-emulator\`. Platforms: \`linux/amd64\`, \`linux/arm64\`."
+            echo
+            echo "### Upstream changes"
+            echo
+            if [ -n "$upstream_notes" ]; then
+              echo "$n_changes changes in [aws-emulator v$VERSION]($upstream_url). The first 15:"
+              echo
+              grep '^- ' <<<"$upstream_notes" | head -15 || true
+              echo
+              echo "[All upstream release notes]($upstream_url)"
+            else
+              echo "See [aws/aws-emulator releases](https://github.com/aws/aws-emulator/releases)."
+            fi
+            echo
+            echo "### Verified upstream packages"
+            echo
+            echo "| File | SHA-256 |"
+            echo "|---|---|"
+            echo "| \`aws-emulator-$v-x86_64.rpm\` | \`$RPM_AMD64\` |"
+            echo "| \`aws-emulator-$v-aarch64.rpm\` | \`$RPM_ARM64\` |"
+            echo "| \`aws-emulator_${v}_amd64.deb\` | \`$DEB_AMD64\` |"
+            echo "| \`aws-emulator_${v}_arm64.deb\` | \`$DEB_ARM64\` |"
+            echo
+            echo "Signatures were checked against the AWS package signing key \`98BC F336 A3BE 53B7 34E9 67C5 2E5B F49B D940 F624\`."
+            echo
+            echo "### Verify"
+            echo
+            echo '```sh'
+            echo "cosign verify ghcr.io/xsavikx/aws-emulator@$d_al \\"
+            echo "  --certificate-identity-regexp '^https://github.com/xSAVIKx/aws-emulator-docker/' \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
+            echo '```'
+          } > notes.md
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create or update the release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$UPSTREAM"
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$tag" -R "$GITHUB_REPOSITORY" --notes-file notes.md --title "AWS Emulator $UPSTREAM"
+          else
+            gh release create "$tag" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "AWS Emulator $UPSTREAM" --notes-file notes.md --latest
+          fi
 
   dockerhub-description:
     name: Update Docker Hub description
