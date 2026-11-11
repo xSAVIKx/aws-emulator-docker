@@ -116,9 +116,7 @@ jobs:
           set -euo pipefail
           v="${UPSTREAM%.*}-${UPSTREAM##*.}"
           sha() { curl -fsSL --retry 5 --retry-all-errors "$DOWNLOAD_BASE/$1" | sha256sum | cut -d' ' -f1; }
-          echo "### Upstream AWS Emulator $UPSTREAM" >> "$GITHUB_STEP_SUMMARY"
-          echo "| file | sha256 |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          printf '### Upstream AWS Emulator %s\n| file | sha256 |\n|---|---|\n' "$UPSTREAM" >> "$GITHUB_STEP_SUMMARY"
           for spec in rpm_sha_amd64:aws-emulator-$v-x86_64.rpm rpm_sha_arm64:aws-emulator-$v-aarch64.rpm \
                       deb_sha_amd64:aws-emulator_${v}_amd64.deb deb_sha_arm64:aws-emulator_${v}_arm64.deb; do
             key=${spec%%:*}; file=${spec#*:}

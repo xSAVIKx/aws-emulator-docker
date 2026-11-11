@@ -1,0 +1,49 @@
+name: AWS Emulator
+description: >-
+  Start the AWS Emulator (https://github.com/aws/aws-emulator) in Docker and point the
+  AWS CLI and SDKs at it. Unofficial community action.
+author: Yurii Serhiichuk
+branding:
+  icon: cloud
+  color: orange
+
+inputs:
+  image:
+    description: Container image to run
+    default: ghcr.io/xsavikx/aws-emulator:latest
+  port:
+    description: Port on 127.0.0.1. The emulator uses the same port inside the container.
+    default: "9297"
+  region:
+    description: AWS Region for the SDKs
+    default: us-east-1
+  telemetry:
+    description: Upstream emulator telemetry, "on" or "off"
+    default: "off"
+  memory:
+    description: Container memory limit
+    default: 2g
+
+outputs:
+  endpoint-url:
+    description: The emulator endpoint, for example https://127.0.0.1:9297
+    value: ${{ steps.start.outputs.endpoint-url }}
+  ca-file:
+    description: The emulator CA certificate (PEM)
+    value: ${{ steps.start.outputs.ca-file }}
+  container:
+    description: The container name
+    value: ${{ steps.start.outputs.container }}
+
+runs:
+  using: composite
+  steps:
+    - id: start
+      shell: bash
+      env:
+        EMULATOR_IMAGE: ${{ inputs.image }}
+        EMULATOR_PORT: ${{ inputs.port }}
+        EMULATOR_REGION: ${{ inputs.region }}
+        EMULATOR_TELEMETRY: ${{ inputs.telemetry }}
+        EMULATOR_MEMORY: ${{ inputs.memory }}
+      run: '"$GITHUB_ACTION_PATH/start-emulator.sh" --github-env'

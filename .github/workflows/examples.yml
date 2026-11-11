@@ -1,0 +1,89 @@
+name: Examples
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "examples/**"
+      - ".github/actions/aws-emulator/**"
+      - ".github/workflows/examples.yml"
+  pull_request:
+    paths:
+      - "examples/**"
+      - ".github/actions/aws-emulator/**"
+      - ".github/workflows/examples.yml"
+  workflow_run:
+    workflows: ["Build and publish"]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Image to test
+        default: ghcr.io/xsavikx/aws-emulator:latest
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.lang }} (${{ matrix.arch }})
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        lang: [python, typescript, java, go, dotnet, rust]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - if: matrix.lang == 'python'
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - if: matrix.lang == 'typescript'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: examples/typescript/.nvmrc
+      - if: matrix.lang == 'java'
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: examples/java/pom.xml
+      - if: matrix.lang == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: examples/go/go.mod
+          cache-dependency-path: examples/go/go.sum
+      - if: matrix.lang == 'dotnet'
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: examples/dotnet/global.json
+
+      - name: Start AWS Emulator
+        uses: ./.github/actions/aws-emulator
+        with:
+          image: ${{ inputs.image || 'ghcr.io/xsavikx/aws-emulator:latest' }}
+
+      - name: Run ${{ matrix.lang }} example
+        run: examples/${{ matrix.lang }}/run-tests.sh
+
+      - name: Emulator logs
+        if: failure()
+        run: docker logs aws-emulator-9297

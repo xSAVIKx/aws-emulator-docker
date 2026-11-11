@@ -1,0 +1,22 @@
+[package]
+name = "aws-emulator-example"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Integration tests for the AWS SDK for Rust against the AWS Emulator"
+
+# The package has no library code. All code is in tests/, and
+# tests/common/mod.rs holds the helpers that every test file shares.
+
+[dev-dependencies]
+# Only the HTTPS client and the Tokio runtime are enabled. The default
+# features also build a legacy hyper 0.14 client, which these tests do not use.
+aws-config = { version = "1.13.2", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
+aws-sdk-dynamodb = { version = "1.139.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-s3 = { version = "1.159.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-secretsmanager = { version = "1.127.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-sns = { version = "1.123.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-sqs = { version = "1.121.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-sts = { version = "1.126.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
+serde_json = "1.0.154"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "time"] }

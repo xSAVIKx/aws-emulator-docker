@@ -99,6 +99,7 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding:24px 0 40px;colo
     <a href="#quick-start">Quick start</a>
     <a href="#images">Images</a>
     <a href="#verify">Verify</a>
+    <a href="#examples">Examples</a>
     <a href="#releases">Releases</a>
     <a class="gh" href="https://github.com/xSAVIKx/aws-emulator-docker">GitHub</a>
   </nav>
@@ -214,6 +215,89 @@ aws sts get-caller-identity</code><button class="copy" type="button">Copy</butto
   <li><b>Health check.</b> The image has a Docker <code>HEALTHCHECK</code> on <code>/__admin/health</code>. For another port, also set <code>-e EMULATOR_HEALTHCHECK_PORT=&lt;port&gt;</code>.</li>
   <li><b>Telemetry.</b> The upstream emulator sends anonymous usage telemetry by default. To turn it off, add <code>-e EMULATOR_TELEMETRY=off</code>.</li>
 </ul>
+
+<h2 id="examples">Examples</h2>
+<p>Integration tests in six languages, with the most common test framework of each language and the official AWS SDK. Every example tests the same scenarios: STS identity, S3 objects, a DynamoDB table, an SQS queue, SNS to SQS fan-out, and a Secrets Manager secret. CI runs all of them on amd64 and arm64 after each image release.</p>
+<div class="tabs" role="tablist" data-group="ex">
+  <button role="tab" aria-selected="true" data-panel="python">Python</button>
+  <button role="tab" aria-selected="false" data-panel="typescript">TypeScript</button>
+  <button role="tab" aria-selected="false" data-panel="java">Java</button>
+  <button role="tab" aria-selected="false" data-panel="go">Go</button>
+  <button role="tab" aria-selected="false" data-panel="dotnet">C#</button>
+  <button role="tab" aria-selected="false" data-panel="rust">Rust</button>
+</div>
+<div class="panel" data-group="ex" data-name="python">
+<p class="muted">pytest + Boto3. <a href="https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples/python">Source and README</a>.</p>
+<pre><code>import boto3
+from botocore.config import Config
+
+# Endpoint, keys, Region and CA come from the environment.
+sts = boto3.client(&quot;sts&quot;)
+s3 = boto3.client(&quot;s3&quot;, config=Config(s3={&quot;addressing_style&quot;: &quot;path&quot;}))
+sqs = boto3.client(&quot;sqs&quot;)</code><button class="copy" type="button">Copy</button></pre>
+<pre><code>examples/with-emulator.sh examples/python/run-tests.sh</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<div class="panel" data-group="ex" data-name="typescript" hidden>
+<p class="muted">Vitest + AWS SDK v3. <a href="https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples/typescript">Source and README</a>.</p>
+<pre><code>import { S3Client } from &quot;@aws-sdk/client-s3&quot;;
+import { SQSClient } from &quot;@aws-sdk/client-sqs&quot;;
+
+// Endpoint, keys, Region and CA come from the environment.
+const s3 = new S3Client({ forcePathStyle: true });
+// The emulator returns queue URLs with the real AWS host.
+// Keep SQS requests on AWS_ENDPOINT_URL:
+const sqs = new SQSClient({ useQueueUrlAsEndpoint: false });</code><button class="copy" type="button">Copy</button></pre>
+<pre><code>examples/with-emulator.sh examples/typescript/run-tests.sh</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<div class="panel" data-group="ex" data-name="java" hidden>
+<p class="muted">JUnit 5 + AWS SDK 2.x. <a href="https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples/java">Source and README</a>.</p>
+<pre><code>// Endpoint, keys and Region come from the environment.
+// JAVA_TOOL_OPTIONS points to a truststore with the JDK CAs + emulator CA.
+S3Client s3 = S3Client.builder().forcePathStyle(true).build();
+SqsClient sqs = SqsClient.create();
+DynamoDbClient dynamo = DynamoDbClient.create();</code><button class="copy" type="button">Copy</button></pre>
+<pre><code>examples/with-emulator.sh examples/java/run-tests.sh</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<div class="panel" data-group="ex" data-name="go" hidden>
+<p class="muted">go test + AWS SDK v2. <a href="https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples/go">Source and README</a>.</p>
+<pre><code>// Endpoint, keys, Region and CA (AWS_CA_BUNDLE) come from the environment.
+cfg, err := config.LoadDefaultConfig(ctx)
+if err != nil {
+	t.Fatal(err)
+}
+s3c := s3.NewFromConfig(cfg, func(o *s3.Options) { o.UsePathStyle = true })
+sqsc := sqs.NewFromConfig(cfg)</code><button class="copy" type="button">Copy</button></pre>
+<pre><code>examples/with-emulator.sh examples/go/run-tests.sh</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<div class="panel" data-group="ex" data-name="dotnet" hidden>
+<p class="muted">xUnit + AWS SDK for .NET v4. <a href="https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples/dotnet">Source and README</a>.</p>
+<pre><code>// SDK v4 reads AWS_ENDPOINT_URL. On Linux, .NET trusts the CA through
+// SSL_CERT_FILE (system CAs + emulator CA).
+var s3 = new AmazonS3Client(new AmazonS3Config { ForcePathStyle = true });
+var sqs = new AmazonSQSClient();
+var dynamo = new AmazonDynamoDBClient();</code><button class="copy" type="button">Copy</button></pre>
+<pre><code>examples/with-emulator.sh examples/dotnet/run-tests.sh</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<div class="panel" data-group="ex" data-name="rust" hidden>
+<p class="muted">cargo test + Tokio. <a href="https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples/rust">Source and README</a>.</p>
+<pre><code>// Endpoint, keys and Region come from the environment. rustls trusts
+// the CA through SSL_CERT_FILE (system CAs + emulator CA).
+let config = aws_config::load_from_env().await; // feature "behavior-version-latest"
+let s3 = aws_sdk_s3::Client::from_conf(
+    aws_sdk_s3::config::Builder::from(&amp;config).force_path_style(true).build(),
+);
+let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type="button">Copy</button></pre>
+<pre><code>examples/with-emulator.sh examples/rust/run-tests.sh</code><button class="copy" type="button">Copy</button></pre>
+</div>
+<h3>Use it in GitHub Actions</h3>
+<p>The repository has a composite action. It starts the emulator, waits until it is healthy, and sets the SDK environment for the next steps.</p>
+<pre><code>steps:
+  - uses: actions/checkout@v5
+  - uses: xSAVIKx/aws-emulator-docker/.github/actions/aws-emulator@main
+    with:
+      image: ghcr.io/xsavikx/aws-emulator:latest
+  - run: aws sts get-caller-identity   # then run your own tests</code><button class="copy" type="button">Copy</button></pre>
+<p class="muted">Two rules apply in every language: use path-style S3 addresses, and make sure SQS calls go to the emulator, not to the host in the queue URL. See the <a href="https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples/">examples README</a>.</p>
 
 <h2 id="images">Images and tags</h2>
 <div class="tablewrap"><table>

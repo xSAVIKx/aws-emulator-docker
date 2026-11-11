@@ -1,0 +1,26 @@
+{
+  "name": "aws-emulator-example-typescript",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Integration tests with the AWS SDK for JavaScript v3 against the AWS Emulator",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --reporter verbose"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "3.1167.0",
+    "@aws-sdk/client-s3": "3.1167.0",
+    "@aws-sdk/client-secrets-manager": "3.1167.0",
+    "@aws-sdk/client-sns": "3.1167.0",
+    "@aws-sdk/client-sqs": "3.1167.0",
+    "@aws-sdk/client-sts": "3.1167.0",
+    "@aws-sdk/lib-dynamodb": "3.1167.0",
+    "@types/node": "24.19.2",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}

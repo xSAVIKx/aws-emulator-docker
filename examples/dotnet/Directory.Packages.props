@@ -1,0 +1,21 @@
+<Project>
+  <!-- Central package management: every package version is pinned here. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- AWS SDK for .NET v4 -->
+    <PackageVersion Include="AWSSDK.SecurityToken" Version="4.0.101.11" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.104.12" />
+    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.110.3" />
+    <PackageVersion Include="AWSSDK.SQS" Version="4.0.100.26" />
+    <PackageVersion Include="AWSSDK.SimpleNotificationService" Version="4.0.100.26" />
+    <PackageVersion Include="AWSSDK.SecretsManager" Version="4.0.100.26" />
+    <!-- Test framework and runner -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <!-- xunit.v3.mtp-off: xUnit v3 without Microsoft.Testing.Platform, so that
+         "dotnet test" uses VSTest and accepts the logger option. -->
+    <PackageVersion Include="xunit.v3.mtp-off" Version="4.0.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+  </ItemGroup>
+</Project>
