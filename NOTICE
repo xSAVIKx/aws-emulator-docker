@@ -1,0 +1,9 @@
+aws-emulator-docker
+Copyright 2026 Yurii Serhiichuk <yurii@serhiichuk.dev>
+
+This product packages the AWS Emulator (https://github.com/aws/aws-emulator),
+which is dedicated to the public domain under CC0 1.0 Universal, with code in
+its vendor/ directory under the Apache License 2.0.
+
+This project is not affiliated with or endorsed by Amazon Web Services.
+"AWS" and "Amazon Web Services" are trademarks of Amazon.com, Inc. or its affiliates.

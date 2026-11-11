@@ -1,0 +1,370 @@
+name: Build and publish
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  schedule:
+    # Check for a new AWS Emulator release every hour.
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Publish even if the version already exists
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE_NAME: aws-emulator
+  GHCR_IMAGE: ghcr.io/xsavikx/aws-emulator
+  DOWNLOAD_BASE: https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/latest
+
+jobs:
+  resolve:
+    name: Resolve upstream version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      upstream_version: ${{ steps.v.outputs.upstream_version }}
+      sha_amd64: ${{ steps.v.outputs.sha_amd64 }}
+      sha_arm64: ${{ steps.v.outputs.sha_arm64 }}
+      publish: ${{ steps.publish.outputs.publish }}
+      created: ${{ steps.v.outputs.created }}
+      base_name: ${{ steps.base.outputs.name }}
+      base_digest: ${{ steps.base.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Read base image from Dockerfile
+        id: base
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref=$(sed -n 's/^ARG BASE_IMAGE=//p' Dockerfile)
+          echo "name=${ref%@*}" | tee -a "$GITHUB_OUTPUT"
+          echo "digest=${ref#*@}" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Resolve version and checksums
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver() { curl -fsSIL "$DOWNLOAD_BASE/aws-emulator-$1.rpm" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-amz-meta-package-version"{print $2}' | tail -1; }
+          v_amd=$(ver x86_64); v_arm=$(ver aarch64)
+          echo "x86_64=$v_amd aarch64=$v_arm"
+          if [ -z "$v_amd" ] || [ "$v_amd" != "$v_arm" ]; then
+            echo "::error::Upstream versions differ or are missing (x86_64=$v_amd aarch64=$v_arm)"; exit 1
+          fi
+          sha() { curl -fsSL --retry 5 --retry-all-errors "$DOWNLOAD_BASE/aws-emulator-$1.rpm" | sha256sum | cut -d' ' -f1; }
+          sha_amd=$(sha x86_64); sha_arm=$(sha aarch64)
+          # Upstream package version is like 1.0.322.1; the emulator reports 1.0.322.
+          echo "upstream_version=$v_amd" >> "$GITHUB_OUTPUT"
+          echo "version=$(echo "$v_amd" | cut -d. -f1-3)" >> "$GITHUB_OUTPUT"
+          echo "sha_amd64=$sha_amd" >> "$GITHUB_OUTPUT"
+          echo "sha_arm64=$sha_arm" >> "$GITHUB_OUTPUT"
+          echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Upstream AWS Emulator"
+            echo "| arch | package version | sha256 |"; echo "|---|---|---|"
+            echo "| x86_64 | $v_amd | \`$sha_amd\` |"
+            echo "| aarch64 | $v_arm | \`$sha_arm\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Decide whether to publish
+        id: publish
+        shell: bash
+        env:
+          UPSTREAM: ${{ steps.v.outputs.upstream_version }}
+          EVENT: ${{ github.event_name }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          publish=false
+          case "$EVENT" in
+            push|workflow_dispatch) publish=true ;;
+            schedule)
+              if docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM" >/dev/null 2>&1; then
+                echo "$GHCR_IMAGE:$UPSTREAM exists. Nothing to do."
+              else
+                publish=true
+              fi ;;
+          esac
+          if [ "$EVENT" = "push" ] && [ "${GITHUB_REF}" != "refs/heads/main" ] && [[ "${GITHUB_REF}" != refs/tags/v* ]]; then publish=false; fi
+          [ "$FORCE" = "true" ] && publish=true
+          echo "publish=$publish" | tee -a "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: resolve
+    if: needs.resolve.outputs.publish == 'true' || github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Prepare
+        shell: bash
+        run: echo "PLATFORM_PAIR=${PLATFORM//\//-}" >> "$GITHUB_ENV"
+        env:
+          PLATFORM: ${{ matrix.platform }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.GHCR_IMAGE }}
+          labels: &labels |
+            org.opencontainers.image.title=AWS Emulator
+            org.opencontainers.image.description=Multi-arch container image of the AWS Emulator, a local emulator of the AWS APIs. Unofficial community build.
+            org.opencontainers.image.authors=Yurii Serhiichuk <yurii@serhiichuk.dev>
+            org.opencontainers.image.vendor=Yurii Serhiichuk
+            org.opencontainers.image.version=${{ needs.resolve.outputs.upstream_version }}
+            org.opencontainers.image.created=${{ needs.resolve.outputs.created }}
+            org.opencontainers.image.licenses=Apache-2.0 AND CC0-1.0
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}#readme
+            org.opencontainers.image.base.name=${{ needs.resolve.outputs.base_name }}
+            org.opencontainers.image.base.digest=${{ needs.resolve.outputs.base_digest }}
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            io.github.aws.aws-emulator.version=${{ needs.resolve.outputs.upstream_version }}
+            io.github.aws.aws-emulator.source=https://github.com/aws/aws-emulator
+
+      - name: Build for test
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:ci
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            RPM_SHA256_AMD64=${{ needs.resolve.outputs.sha_amd64 }}
+            RPM_SHA256_ARM64=${{ needs.resolve.outputs.sha_arm64 }}
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
+
+      - name: Smoke test
+        shell: bash
+        run: ./tests/smoke.sh "${IMAGE_NAME}:ci"
+
+      - name: Log in to GHCR
+        if: needs.resolve.outputs.publish == 'true'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push by digest
+        id: build
+        if: needs.resolve.outputs.publish == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          build-args: |
+            RPM_SHA256_AMD64=${{ needs.resolve.outputs.sha_amd64 }}
+            RPM_SHA256_ARM64=${{ needs.resolve.outputs.sha_arm64 }}
+          outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+
+      - name: Export digest
+        if: needs.resolve.outputs.publish == 'true'
+        shell: bash
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+      - name: Upload digest
+        if: needs.resolve.outputs.publish == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish multi-arch manifest
+    needs: [resolve, build]
+    if: needs.resolve.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write        # cosign keyless signing and attestations
+      attestations: write
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      QUAY_USERNAME: ${{ secrets.QUAY_USERNAME }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to Quay.io
+        if: env.QUAY_USERNAME != ''
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Image list
+        id: images
+        shell: bash
+        env:
+          DH_NS: ${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}
+          QUAY_NS: ${{ vars.QUAY_NAMESPACE || secrets.QUAY_USERNAME }}
+        run: |
+          {
+            echo "list<<EOF"
+            echo "$GHCR_IMAGE"
+            [ -n "$DOCKERHUB_USERNAME" ] && echo "docker.io/$DH_NS/$IMAGE_NAME"
+            [ -n "$QUAY_USERNAME" ] && echo "quay.io/$QUAY_NS/$IMAGE_NAME"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index
+        with:
+          images: ${{ steps.images.outputs.list }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=${{ needs.resolve.outputs.upstream_version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
+            type=raw,value=${{ needs.resolve.outputs.version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.resolve.outputs.version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
+            type=semver,pattern={{major}},value=${{ needs.resolve.outputs.version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
+            type=raw,value=lts,enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
+            type=ref,event=tag
+            type=sha,format=short,prefix=sha-
+          labels: *labels
+
+      - name: Create and push manifest lists
+        shell: bash
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          TAGS_JSON: ${{ steps.meta.outputs.json }}
+        run: |
+          set -euo pipefail
+          sources=$(printf "$GHCR_IMAGE@sha256:%s " *)
+          tags=$(jq -cr '.tags | map("-t " + .) | join(" ")' <<<"$TAGS_JSON")
+          annotations=$(jq -cr '.annotations | map("--annotation \"" + . + "\"") | join(" ")' <<<"$TAGS_JSON")
+          eval docker buildx imagetools create $tags $annotations $sources
+
+      - name: Inspect
+        id: digest
+        shell: bash
+        env:
+          VERSION: ${{ needs.resolve.outputs.upstream_version }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "$GHCR_IMAGE:sha-${GITHUB_SHA::7}"
+          digest=$(docker buildx imagetools inspect "$GHCR_IMAGE:sha-${GITHUB_SHA::7}" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "digest=$digest" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Sign images with cosign (keyless)
+        shell: bash
+        env:
+          IMAGES: ${{ steps.images.outputs.list }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          set -euo pipefail
+          while read -r img; do
+            [ -n "$img" ] && cosign sign --yes "$img@$DIGEST"
+          done <<<"$IMAGES"
+
+      - name: GitHub build provenance attestation (GHCR)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.GHCR_IMAGE }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
+      - name: Summary
+        shell: bash
+        env:
+          TAGS_JSON: ${{ steps.meta.outputs.json }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          {
+            echo "### Published"
+            echo "Digest: \`$DIGEST\`"
+            jq -r '.tags[] | "- `" + . + "`"' <<<"$TAGS_JSON"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dockerhub-description:
+    name: Update Docker Hub description
+    needs: publish
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.DOCKERHUB_USERNAME != ''
+        with:
+          persist-credentials: false
+      - uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        if: env.DOCKERHUB_USERNAME != ''
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/aws-emulator
+          short-description: Multi-arch (amd64/arm64) image of the AWS Emulator, a local emulator of the AWS APIs.
+          readme-filepath: ./README.md
