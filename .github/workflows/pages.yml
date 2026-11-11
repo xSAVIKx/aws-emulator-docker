@@ -35,7 +35,9 @@ jobs:
           v=$(curl -fsSL --retry 5 https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/versions.json \
             | jq -r '.versions[].version' | sort -V | tail -1)
           short=$(cut -d. -f1-3 <<<"$v")
-          sed -i "s/__VERSION_SHORT__/$short/g; s/__VERSION__/$v/g" site/index.html
+          today=$(date -u +%Y-%m-%d)
+          sed -i "s/__VERSION_SHORT__/$short/g; s/__VERSION__/$v/g; s/__DATE__/$today/g" \
+            site/index.html site/sitemap.xml site/llms.txt
           echo "Version: $v"
 
       - name: Render release notes

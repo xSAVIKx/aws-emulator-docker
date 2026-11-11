@@ -1,0 +1,51 @@
+# AWS Emulator Docker Image
+
+> Unofficial, signed, multi-arch (linux/amd64, linux/arm64) container image of the AWS Emulator (https://github.com/aws/aws-emulator), a local emulator of the AWS APIs. Current upstream version: __VERSION__. Maintained by Yurii Serhiichuk (https://serhiichuk.dev). Not affiliated with Amazon Web Services.
+
+AWS does not publish a prebuilt image. This project builds one from the pinned, signature-checked upstream RPM or DEB package, tests it on both architectures, signs it with cosign (with SBOM and SLSA provenance), and publishes it within one hour of each upstream release.
+
+## Images
+
+- `ghcr.io/xsavikx/aws-emulator`, `docker.io/xsavikx/aws-emulator`, `quay.io/xsavikx/aws-emulator`
+- Tags: `latest`, `lts`, `__VERSION__` (package version), `1.0`, `1`, immutable build tags `__VERSION__-<yyyymmdd>.<run>`; Debian variant with the `-debian` suffix and `debian`.
+
+## Quick start
+
+```sh
+mkdir -p ~/.aws/emulator
+docker run --rm --memory=2g -p 127.0.0.1:9297:9297 \
+  --user "$(id -u):$(id -g)" \
+  -e HOME="$HOME" -v "$HOME/.aws/emulator:$HOME/.aws/emulator" \
+  ghcr.io/xsavikx/aws-emulator -p 9297
+export AWS_ENDPOINT_URL=https://127.0.0.1:9297
+export AWS_SHARED_CREDENTIALS_FILE=~/.aws/emulator/9297/emulator_credentials
+export AWS_CONFIG_FILE=~/.aws/emulator/9297/config
+export AWS_CA_BUNDLE=~/.aws/emulator/9297/ca.pem
+export AWS_REGION=us-east-1
+aws sts get-caller-identity   # Account 000000000000
+```
+
+## Key facts
+
+- Publish the port only on 127.0.0.1; the image binds 0.0.0.0 inside the container.
+- Use the same port on the host, in the container and in the emulator `-p` argument.
+- TLS uses a self-signed CA (`ca.pem`) that is new at each start. Node.js needs NODE_EXTRA_CA_CERTS; Rust and .NET need SSL_CERT_FILE; Java needs a truststore.
+- Rootless Docker: use `--user 0:0`. Podman: `--userns=keep-id`.
+- Use 127.0.0.1, not localhost, and path-style S3 addresses.
+- AWS SDK for JavaScript v3: set `useQueueUrlAsEndpoint: false` on SQSClient, or SQS requests go to real AWS.
+- Other containers cannot reach the emulator by service name: the certificate names only localhost, 127.0.0.1 and ::1.
+- All state is in memory. Give the container 2 GiB.
+
+## GitHub Action
+
+- Run AWS Emulator: https://github.com/marketplace/actions/run-aws-emulator
+- Usage: `- uses: xSAVIKx/run-aws-emulator@v1` — starts the image, waits until healthy, sets AWS_ENDPOINT_URL, credentials and CA variables for the next steps.
+
+## Links
+
+- Website: https://xsavikx.github.io/aws-emulator-docker/
+- Source: https://github.com/xSAVIKx/aws-emulator-docker
+- Examples (Python pytest, TypeScript Vitest, Java JUnit 5, Go, C# xUnit, Rust): https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples
+- Releases: https://github.com/xSAVIKx/aws-emulator-docker/releases
+- Action source: https://github.com/xSAVIKx/run-aws-emulator
+- Upstream: https://github.com/aws/aws-emulator and https://docs.aws.amazon.com/emulator/latest/userguide/

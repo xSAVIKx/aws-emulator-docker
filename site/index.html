@@ -3,19 +3,243 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AWS Emulator Docker Image</title>
-<meta name="description" content="Multi-arch (amd64/arm64) container image of the AWS Emulator, a local emulator of the AWS APIs. Signed, tested, and published to GHCR, Docker Hub and Quay.io.">
+<title>AWS Emulator Docker Image: Local AWS APIs in Docker and CI</title>
+<meta name="description" content="Run the AWS Emulator (local AWS APIs: S3, DynamoDB, SQS, SNS and more) as a signed multi-arch Docker image for amd64 and arm64, with a GitHub Action and tested examples in six languages.">
 <meta name="author" content="Yurii Serhiichuk">
-<meta property="og:title" content="AWS Emulator Docker Image">
-<meta property="og:description" content="Run the AWS Emulator in one command on Linux, macOS and Windows. amd64 and arm64. Signed, with SBOM and provenance.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#ff9f1c" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta property="og:site_name" content="AWS Emulator Docker Image">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="AWS Emulator Docker Image: Local AWS APIs in Docker and CI">
+<meta property="og:description" content="Run the AWS Emulator in one command on Linux, macOS and Windows. amd64 and arm64. Signed, with SBOM, provenance, a GitHub Action and examples in six languages.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://xsavikx.github.io/aws-emulator-docker/">
 <meta property="og:image" content="https://xsavikx.github.io/aws-emulator-docker/social-preview.png">
+<meta property="og:image:alt" content="The AWS Emulator, ready to run in Docker">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
+<meta property="article:author" content="https://serhiichuk.dev">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AWS Emulator Docker Image: Local AWS APIs in Docker and CI">
+<meta name="twitter:description" content="Signed multi-arch image of the AWS Emulator, with a GitHub Action and tested examples in six languages.">
+<meta name="twitter:image" content="https://xsavikx.github.io/aws-emulator-docker/social-preview.png">
+<meta name="twitter:image:alt" content="The AWS Emulator, ready to run in Docker">
 <link rel="canonical" href="https://xsavikx.github.io/aws-emulator-docker/">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff9900'/%3E%3Cpath d='M7 13h18v10H7z M10 9h12v4H10z' fill='%23141a22'/%3E%3C/svg%3E">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="author" href="https://serhiichuk.dev">
+<link rel="me" href="https://github.com/xSAVIKx">
+<link rel="alternate" type="application/atom+xml" title="Releases" href="https://github.com/xSAVIKx/aws-emulator-docker/releases.atom">
+<link rel="alternate" type="text/markdown" title="LLM summary" href="llms.txt">
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "WebSite",
+   "@id": "https://xsavikx.github.io/aws-emulator-docker/#website",
+   "url": "https://xsavikx.github.io/aws-emulator-docker/",
+   "name": "AWS Emulator Docker Image",
+   "inLanguage": "en",
+   "publisher": {
+    "@id": "https://serhiichuk.dev/#person"
+   }
+  },
+  {
+   "@type": "WebPage",
+   "@id": "https://xsavikx.github.io/aws-emulator-docker/#webpage",
+   "url": "https://xsavikx.github.io/aws-emulator-docker/",
+   "name": "AWS Emulator Docker Image: local AWS APIs in Docker and CI",
+   "isPartOf": {
+    "@id": "https://xsavikx.github.io/aws-emulator-docker/#website"
+   },
+   "about": {
+    "@id": "https://xsavikx.github.io/aws-emulator-docker/#software"
+   },
+   "primaryImageOfPage": {
+    "@type": "ImageObject",
+    "url": "https://xsavikx.github.io/aws-emulator-docker/social-preview.png",
+    "width": 1280,
+    "height": 640
+   },
+   "dateModified": "__DATE__",
+   "inLanguage": "en",
+   "author": {
+    "@id": "https://serhiichuk.dev/#person"
+   }
+  },
+  {
+   "@type": "Person",
+   "@id": "https://serhiichuk.dev/#person",
+   "name": "Yurii Serhiichuk",
+   "url": "https://serhiichuk.dev",
+   "sameAs": [
+    "https://github.com/xSAVIKx",
+    "https://serhiichuk.dev"
+   ]
+  },
+  {
+   "@type": "SoftwareApplication",
+   "@id": "https://xsavikx.github.io/aws-emulator-docker/#software",
+   "name": "AWS Emulator Docker Image",
+   "alternateName": "aws-emulator-docker",
+   "description": "Multi-arch (linux/amd64, linux/arm64) container image of the AWS Emulator, a local emulator of the AWS APIs. Tested, signed with cosign, with SBOM and SLSA provenance. Unofficial community build.",
+   "applicationCategory": "DeveloperApplication",
+   "applicationSubCategory": "Container image",
+   "operatingSystem": "Linux, macOS, Windows (Docker)",
+   "softwareVersion": "__VERSION__",
+   "url": "https://xsavikx.github.io/aws-emulator-docker/",
+   "downloadUrl": "https://github.com/xSAVIKx/aws-emulator-docker/pkgs/container/aws-emulator",
+   "installUrl": "https://xsavikx.github.io/aws-emulator-docker/#quick-start",
+   "releaseNotes": "https://xsavikx.github.io/aws-emulator-docker/#releases",
+   "image": "https://xsavikx.github.io/aws-emulator-docker/social-preview.png",
+   "license": "https://www.apache.org/licenses/LICENSE-2.0",
+   "isAccessibleForFree": true,
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+   },
+   "author": {
+    "@id": "https://serhiichuk.dev/#person"
+   },
+   "maintainer": {
+    "@id": "https://serhiichuk.dev/#person"
+   },
+   "sameAs": [
+    "https://github.com/xSAVIKx/aws-emulator-docker",
+    "https://hub.docker.com/r/xsavikx/aws-emulator",
+    "https://quay.io/repository/xsavikx/aws-emulator"
+   ],
+   "keywords": "AWS Emulator, Docker, local AWS, S3, DynamoDB, SQS, SNS, integration testing, arm64"
+  },
+  {
+   "@type": "SoftwareSourceCode",
+   "@id": "https://github.com/xSAVIKx/aws-emulator-docker#code",
+   "name": "aws-emulator-docker",
+   "codeRepository": "https://github.com/xSAVIKx/aws-emulator-docker",
+   "programmingLanguage": [
+    "Dockerfile",
+    "Shell"
+   ],
+   "runtimePlatform": "Docker",
+   "license": "https://www.apache.org/licenses/LICENSE-2.0",
+   "author": {
+    "@id": "https://serhiichuk.dev/#person"
+   },
+   "targetProduct": {
+    "@id": "https://xsavikx.github.io/aws-emulator-docker/#software"
+   }
+  },
+  {
+   "@type": "SoftwareSourceCode",
+   "@id": "https://github.com/xSAVIKx/run-aws-emulator#code",
+   "name": "Run AWS Emulator (GitHub Action)",
+   "description": "GitHub Action that runs the AWS Emulator Docker image and points the AWS CLI and SDKs at it. Unofficial community action.",
+   "codeRepository": "https://github.com/xSAVIKx/run-aws-emulator",
+   "url": "https://github.com/marketplace/actions/run-aws-emulator",
+   "programmingLanguage": [
+    "YAML",
+    "Shell"
+   ],
+   "runtimePlatform": "GitHub Actions",
+   "license": "https://www.apache.org/licenses/LICENSE-2.0",
+   "author": {
+    "@id": "https://serhiichuk.dev/#person"
+   }
+  },
+  {
+   "@type": "FAQPage",
+   "@id": "https://xsavikx.github.io/aws-emulator-docker/#faq",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "What is the AWS Emulator?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The AWS Emulator is a local emulator of the AWS APIs from Amazon Web Services. It serves STS, S3, DynamoDB, SQS, SNS, Secrets Manager and many other services over HTTPS on 127.0.0.1, so tests and coding agents can run without an AWS account."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Does AWS publish a Docker image of the AWS Emulator?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. The AWS guide tells you to build an image yourself from a short Dockerfile. This project builds that image for linux/amd64 and linux/arm64, tests it, signs it, and publishes it to GHCR, Docker Hub and Quay.io."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How do I run the AWS Emulator in Docker?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Create ~/.aws/emulator, then run: docker run --rm -p 127.0.0.1:9297:9297 --user \"$(id -u):$(id -g)\" -e HOME=\"$HOME\" -v \"$HOME/.aws/emulator:$HOME/.aws/emulator\" ghcr.io/xsavikx/aws-emulator -p 9297. Then set AWS_ENDPOINT_URL=https://127.0.0.1:9297 and the other variables from the quick start."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Does the image work on macOS, Windows and Apple silicon?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. The image is a Linux image for amd64 and arm64. Docker Desktop runs it on macOS with Intel or Apple silicon and on Windows with the WSL 2 backend. Windows containers are not available, because the emulator runs only on Linux."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How do I use the AWS Emulator in GitHub Actions?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Add the step uses: xSAVIKx/run-aws-emulator@v1. The Run AWS Emulator action starts the image, waits until it is healthy, and sets AWS_ENDPOINT_URL, the credentials, and the CA settings, so the AWS CLI and the SDKs in the next steps use the emulator."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Why do my SQS calls with the AWS SDK for JavaScript v3 go to real AWS?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The emulator returns queue URLs with the real AWS host, for example https://sqs.us-east-1.amazonaws.com/000000000000/my-queue. The AWS SDK for JavaScript v3 sends SQS requests to the host in the queue URL. Set useQueueUrlAsEndpoint: false on the SQSClient. The SDKs for Python, Go, Java, .NET and Rust need no setting."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Why does the emulator fail with Permission denied on rootless Docker?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "With rootless Docker, container user IDs map to other host user IDs, so the emulator cannot write to the mounted directory. Use --user 0:0, because container root maps to your own host user. With Podman, use --userns=keep-id."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Should I use localhost or 127.0.0.1 in AWS_ENDPOINT_URL?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Use 127.0.0.1. With a host name such as localhost, some SDKs use virtual-hosted S3 addresses such as bucket.localhost, which do not resolve. Also use path-style S3 addresses in your S3 client."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How do I verify the image?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Each image has a keyless cosign signature, an SBOM and SLSA provenance. Run cosign verify (version 3 or later) with --certificate-identity-regexp '^https://github.com/xSAVIKx/aws-emulator-docker/' and --certificate-oidc-issuer https://token.actions.githubusercontent.com, or run gh attestation verify with --owner xSAVIKx."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is this an official AWS project?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. This is an unofficial community project by Yurii Serhiichuk. It is not affiliated with or endorsed by Amazon Web Services. The AWS Emulator itself is open source under CC0 1.0, with vendored code under the Apache License 2.0."
+     }
+    }
+   ]
+  }
+ ]
+}
+</script>
 <style>
 :root{
   --bg:#ffffff;--bg-soft:#f5f7fa;--fg:#141a22;--muted:#5a6573;--line:#e3e8ef;
@@ -102,6 +326,7 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding:24px 0 40px;colo
     <a href="#examples">Examples</a>
     <a href="#github-action">Action</a>
     <a href="#releases">Releases</a>
+    <a href="#faq">FAQ</a>
     <a class="gh" href="https://github.com/xSAVIKx/aws-emulator-docker">GitHub</a>
   </nav>
 </div></header>
@@ -379,6 +604,20 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
   --certificate-oidc-issuer https://token.actions.githubusercontent.com</code><button class="copy" type="button">Copy</button></pre>
 <pre><code>gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx</code><button class="copy" type="button">Copy</button></pre>
 <p class="muted">The build checks the upstream RPM against the AWS package signing key, <code>SSM Publishing &lt;ssm-publishing@amazon.com&gt;</code>, fingerprint <code>98BC F336 A3BE 53B7 34E9 67C5 2E5B F49B D940 F624</code>. The base image is pinned by digest.</p>
+
+<h2 id="faq">Frequently asked questions</h2>
+<div class="releases">
+<details class="release faq"><summary><b>What is the AWS Emulator?</b></summary><div class="release-body"><p>The AWS Emulator is a local emulator of the AWS APIs from Amazon Web Services. It serves STS, S3, DynamoDB, SQS, SNS, Secrets Manager and many other services over HTTPS on 127.0.0.1, so tests and coding agents can run without an AWS account.</p></div></details>
+<details class="release faq"><summary><b>Does AWS publish a Docker image of the AWS Emulator?</b></summary><div class="release-body"><p>No. The AWS guide tells you to build an image yourself from a short Dockerfile. This project builds that image for linux/amd64 and linux/arm64, tests it, signs it, and publishes it to GHCR, Docker Hub and Quay.io.</p></div></details>
+<details class="release faq"><summary><b>How do I run the AWS Emulator in Docker?</b></summary><div class="release-body"><p>Create ~/.aws/emulator, then run: docker run --rm -p 127.0.0.1:9297:9297 --user &quot;$(id -u):$(id -g)&quot; -e HOME=&quot;$HOME&quot; -v &quot;$HOME/.aws/emulator:$HOME/.aws/emulator&quot; ghcr.io/xsavikx/aws-emulator -p 9297. Then set AWS_ENDPOINT_URL=https://127.0.0.1:9297 and the other variables from the quick start.</p></div></details>
+<details class="release faq"><summary><b>Does the image work on macOS, Windows and Apple silicon?</b></summary><div class="release-body"><p>Yes. The image is a Linux image for amd64 and arm64. Docker Desktop runs it on macOS with Intel or Apple silicon and on Windows with the WSL 2 backend. Windows containers are not available, because the emulator runs only on Linux.</p></div></details>
+<details class="release faq"><summary><b>How do I use the AWS Emulator in GitHub Actions?</b></summary><div class="release-body"><p>Add the step uses: xSAVIKx/run-aws-emulator@v1. The Run AWS Emulator action starts the image, waits until it is healthy, and sets AWS_ENDPOINT_URL, the credentials, and the CA settings, so the AWS CLI and the SDKs in the next steps use the emulator.</p></div></details>
+<details class="release faq"><summary><b>Why do my SQS calls with the AWS SDK for JavaScript v3 go to real AWS?</b></summary><div class="release-body"><p>The emulator returns queue URLs with the real AWS host, for example https://sqs.us-east-1.amazonaws.com/000000000000/my-queue. The AWS SDK for JavaScript v3 sends SQS requests to the host in the queue URL. Set useQueueUrlAsEndpoint: false on the SQSClient. The SDKs for Python, Go, Java, .NET and Rust need no setting.</p></div></details>
+<details class="release faq"><summary><b>Why does the emulator fail with Permission denied on rootless Docker?</b></summary><div class="release-body"><p>With rootless Docker, container user IDs map to other host user IDs, so the emulator cannot write to the mounted directory. Use --user 0:0, because container root maps to your own host user. With Podman, use --userns=keep-id.</p></div></details>
+<details class="release faq"><summary><b>Should I use localhost or 127.0.0.1 in AWS_ENDPOINT_URL?</b></summary><div class="release-body"><p>Use 127.0.0.1. With a host name such as localhost, some SDKs use virtual-hosted S3 addresses such as bucket.localhost, which do not resolve. Also use path-style S3 addresses in your S3 client.</p></div></details>
+<details class="release faq"><summary><b>How do I verify the image?</b></summary><div class="release-body"><p>Each image has a keyless cosign signature, an SBOM and SLSA provenance. Run cosign verify (version 3 or later) with --certificate-identity-regexp &#x27;^https://github.com/xSAVIKx/aws-emulator-docker/&#x27; and --certificate-oidc-issuer https://token.actions.githubusercontent.com, or run gh attestation verify with --owner xSAVIKx.</p></div></details>
+<details class="release faq"><summary><b>Is this an official AWS project?</b></summary><div class="release-body"><p>No. This is an unofficial community project by Yurii Serhiichuk. It is not affiliated with or endorsed by Amazon Web Services. The AWS Emulator itself is open source under CC0 1.0, with vendored code under the Apache License 2.0.</p></div></details>
+</div>
 
 <h2 id="releases">Release notes</h2>
 <p>Each new upstream version gets a release, with the image digests, the verified upstream packages and a summary of the upstream changes. <a href="https://github.com/xSAVIKx/aws-emulator-docker/releases.atom">Subscribe with the Atom feed</a>, or watch the repository on GitHub for releases.</p>

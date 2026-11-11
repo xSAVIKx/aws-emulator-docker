@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://xsavikx.github.io/aws-emulator-docker/sitemap.xml
