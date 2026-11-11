@@ -38,14 +38,17 @@ aws sts get-caller-identity   # Account 000000000000
 
 ## GitHub Action
 
-- Run AWS Emulator: https://github.com/marketplace/actions/run-aws-emulator
-- Usage: `- uses: xSAVIKx/run-aws-emulator@v1` — starts the image, waits until healthy, sets AWS_ENDPOINT_URL, credentials and CA variables for the next steps.
+- [Run AWS Emulator on the GitHub Marketplace](https://github.com/marketplace/actions/run-aws-emulator): `- uses: xSAVIKx/run-aws-emulator@v1` starts the image, waits until healthy, and sets AWS_ENDPOINT_URL, credentials and CA variables for the next steps. Runs on Ubuntu 22.04, 24.04 and 26.04 (x64 and arm64) and on self-hosted Linux with Docker or Podman.
 
-## Links
+## Docs
 
-- Website: https://xsavikx.github.io/aws-emulator-docker/
-- Source: https://github.com/xSAVIKx/aws-emulator-docker
-- Examples (Python pytest, TypeScript Vitest, Java JUnit 5, Go, C# xUnit, Rust): https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples
-- Releases: https://github.com/xSAVIKx/aws-emulator-docker/releases
-- Action source: https://github.com/xSAVIKx/run-aws-emulator
-- Upstream: https://github.com/aws/aws-emulator and https://docs.aws.amazon.com/emulator/latest/userguide/
+- [Website](https://xsavikx.github.io/aws-emulator-docker/): quick start, facts, examples, action, tags, verification, FAQ, release notes
+- [Source repository](https://github.com/xSAVIKx/aws-emulator-docker): Dockerfiles, CI, tests
+- [Examples](https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples): Python pytest, TypeScript Vitest, Java JUnit 5, Go, C# xUnit, Rust
+- [Releases](https://github.com/xSAVIKx/aws-emulator-docker/releases): image digests and upstream changes per version
+- [Action source](https://github.com/xSAVIKx/run-aws-emulator)
+
+## Optional
+
+- [Upstream AWS Emulator](https://github.com/aws/aws-emulator)
+- [AWS Emulator user guide](https://docs.aws.amazon.com/emulator/latest/userguide/)
