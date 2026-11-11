@@ -311,10 +311,11 @@ jobs:
           TAGS_JSON: ${{ steps.meta.outputs.json }}
         run: |
           set -euo pipefail
-          sources=$(printf "$GHCR_IMAGE@sha256:%s " *)
-          tags=$(jq -cr '.tags | map("-t " + .) | join(" ")' <<<"$TAGS_JSON")
-          annotations=$(jq -cr '.annotations | map("--annotation \"" + . + "\"") | join(" ")' <<<"$TAGS_JSON")
-          eval docker buildx imagetools create $tags $annotations $sources
+          args=()
+          while IFS= read -r t; do args+=(-t "$t"); done < <(jq -r '.tags[]' <<<"$TAGS_JSON")
+          while IFS= read -r a; do args+=(--annotation "$a"); done < <(jq -r '.annotations[]' <<<"$TAGS_JSON")
+          for d in *; do args+=("$GHCR_IMAGE@sha256:$d"); done
+          docker buildx imagetools create "${args[@]}"
 
       - name: Inspect
         id: digest

@@ -23,7 +23,7 @@ ARG EMULATOR_CHANNEL=LTS
 ARG EMULATOR_DOWNLOAD_BASE=https://downloads.aws.com/aws-emulator/packages/aws-emulator
 # AWS package signing key "SSM Publishing <ssm-publishing@amazon.com>".
 # Source: https://downloads.aws.com/keys/gpg/current.asc
-ARG SIGNING_KEY_FINGERPRINT=98BCF336A3BE53B734E967C52E5BF49BD940F624
+ARG RPM_SIGNER_FINGERPRINT=98BCF336A3BE53B734E967C52E5BF49BD940F624
 # Optional SHA-256 digests. CI sets them. When set, the build fails on a mismatch.
 ARG RPM_SHA256_AMD64=""
 ARG RPM_SHA256_ARM64=""
@@ -47,7 +47,7 @@ RUN set -eu; \
     fi; \
     rpmkeys --import /keys/aws-emulator-signing-key.asc; \
     rpm -q --qf '%{VERSION}-%{RELEASE}\n' gpg-pubkey; \
-    fp_short="$(echo "${SIGNING_KEY_FINGERPRINT}" | tail -c 9 | tr 'A-F' 'a-f')"; \
+    fp_short="$(echo "${RPM_SIGNER_FINGERPRINT}" | tail -c 9 | tr 'A-F' 'a-f')"; \
     rpm -q gpg-pubkey --qf '%{VERSION}\n' | grep -qx "${fp_short}"; \
     rpmkeys --checksig /aws-emulator.rpm | tee /dev/stderr | grep -Eq ': (digests )?signatures OK$'
 

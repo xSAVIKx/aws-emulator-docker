@@ -141,7 +141,7 @@ digest of each RPM, and checks the RPM signature with the AWS package signing ke
 <https://downloads.aws.com/keys/gpg/current.asc>, stored in [`keys/`](keys/)). The base image
 is pinned by digest.
 
-Verify a signature:
+Verify a signature (cosign v3 or later; v2 reports "no signatures found"):
 
 ```sh
 cosign verify ghcr.io/xsavikx/aws-emulator:latest \
