@@ -100,6 +100,7 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding:24px 0 40px;colo
     <a href="#images">Images</a>
     <a href="#verify">Verify</a>
     <a href="#examples">Examples</a>
+    <a href="#github-action">Action</a>
     <a href="#releases">Releases</a>
     <a class="gh" href="https://github.com/xSAVIKx/aws-emulator-docker">GitHub</a>
   </nav>
@@ -289,15 +290,57 @@ let s3 = aws_sdk_s3::Client::from_conf(
 let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type="button">Copy</button></pre>
 <pre><code>examples/with-emulator.sh examples/rust/run-tests.sh</code><button class="copy" type="button">Copy</button></pre>
 </div>
-<h3>Use it in GitHub Actions</h3>
-<p>The <a href="https://github.com/marketplace/actions/run-aws-emulator">Run AWS Emulator</a> action on the GitHub Marketplace starts the emulator, waits until it is healthy, and sets the SDK environment for the next steps. It works on amd64 and arm64 runners.</p>
-<pre><code>steps:
-  - uses: actions/checkout@v5
-  - uses: xSAVIKx/run-aws-emulator@v1
-    with:
-      image: ghcr.io/xsavikx/aws-emulator:latest
-  - run: aws sts get-caller-identity   # then run your own tests</code><button class="copy" type="button">Copy</button></pre>
 <p class="muted">Two rules apply in every language: use path-style S3 addresses, and make sure SQS calls go to the emulator, not to the host in the queue URL. See the <a href="https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples/">examples README</a>.</p>
+
+<h2 id="github-action">GitHub Action</h2>
+<p><a href="https://github.com/marketplace/actions/run-aws-emulator"><img src="https://img.shields.io/badge/Marketplace-Run%20AWS%20Emulator-orange?logo=github" alt="Run AWS Emulator on the GitHub Marketplace" height="20"></a></p>
+<p>The <a href="https://github.com/marketplace/actions/run-aws-emulator">Run AWS Emulator</a> action runs this image in your workflow. It waits until the emulator is healthy and sets the environment, so the AWS CLI and the SDKs in the next steps use the emulator with no code change. It works on <code>ubuntu-24.04</code>, <code>ubuntu-24.04-arm</code> and any other runner with Docker.</p>
+<pre><code>jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: xSAVIKx/run-aws-emulator@v1
+      - run: aws sts get-caller-identity   # "Account": "000000000000"
+      - run: make integration-test         # your SDK tests use the emulator</code><button class="copy" type="button">Copy</button></pre>
+<p>For reproducible runs, pin the image to a build tag or a digest:</p>
+<pre><code>      - uses: xSAVIKx/run-aws-emulator@v1
+        with:
+          image: ghcr.io/xsavikx/aws-emulator:__VERSION__</code><button class="copy" type="button">Copy</button></pre>
+
+<h3>Inputs</h3>
+<div class="tablewrap"><table>
+  <thead><tr><th>Input</th><th>Default</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>image</code></td><td><code>ghcr.io/xsavikx/aws-emulator:latest</code></td><td>The image. Use a <code>-debian</code> tag for the Debian variant.</td></tr>
+    <tr><td><code>port</code></td><td><code>9297</code></td><td>The port on <code>127.0.0.1</code>. The container uses the same port.</td></tr>
+    <tr><td><code>region</code></td><td><code>us-east-1</code></td><td>The value of <code>AWS_REGION</code> and <code>AWS_DEFAULT_REGION</code>.</td></tr>
+    <tr><td><code>telemetry</code></td><td><code>off</code></td><td>Upstream emulator telemetry, <code>on</code> or <code>off</code>.</td></tr>
+    <tr><td><code>memory</code></td><td><code>2g</code></td><td>The container memory limit.</td></tr>
+    <tr><td><code>wait-timeout</code></td><td><code>60</code></td><td>Seconds to wait until the emulator is healthy.</td></tr>
+    <tr><td><code>pull</code></td><td><code>false</code></td><td>Pull the image before the start.</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Outputs</h3>
+<div class="tablewrap"><table>
+  <thead><tr><th>Output</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>endpoint-url</code></td><td>The endpoint, for example <code>https://127.0.0.1:9297</code>.</td></tr>
+    <tr><td><code>ca-file</code></td><td>The emulator CA certificate (PEM).</td></tr>
+    <tr><td><code>container</code></td><td>The container name, for <code>docker logs</code>.</td></tr>
+    <tr><td><code>image-digest</code></td><td>The repository digest of the image that runs.</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Environment for the next steps</h3>
+<ul class="facts">
+  <li><code>AWS_ENDPOINT_URL</code>, <code>AWS_SHARED_CREDENTIALS_FILE</code>, <code>AWS_CONFIG_FILE</code>, <code>AWS_REGION</code> and <code>AWS_DEFAULT_REGION</code> point the CLI and SDKs at the emulator.</li>
+  <li><code>AWS_CA_BUNDLE</code> and <code>NODE_EXTRA_CA_CERTS</code> contain the emulator CA.</li>
+  <li><code>SSL_CERT_FILE</code> (system CAs + emulator CA) and <code>JAVA_TOOL_OPTIONS</code> (JDK CAs + emulator CA) are combined trust files. Downloads from Maven, NuGet and crates.io keep working in the same job.</li>
+  <li>Do not set <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code> or <code>AWS_PROFILE</code> in the job. The SDKs use these before the emulator credentials file.</li>
+</ul>
+<p class="muted">Source: <a href="https://github.com/xSAVIKx/run-aws-emulator">xSAVIKx/run-aws-emulator</a>. Unofficial community action.</p>
 
 <h2 id="images">Images and tags</h2>
 <div class="tablewrap"><table>
