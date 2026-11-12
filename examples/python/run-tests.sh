@@ -5,5 +5,5 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-# --frozen: use uv.lock exactly as committed; never re-resolve versions.
-exec uv run --frozen pytest -v "$@"
+# --locked: use uv.lock as committed. Stop if uv.lock does not match pyproject.toml.
+exec uv run --locked pytest -v "$@"

@@ -2,6 +2,8 @@ module github.com/xSAVIKx/aws-emulator-docker/examples/go
 
 go 1.25.0
 
+toolchain go1.25.14
+
 require (
 	github.com/aws/aws-sdk-go-v2 v1.48.0
 	github.com/aws/aws-sdk-go-v2/config v1.33.18

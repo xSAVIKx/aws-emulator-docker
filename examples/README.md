@@ -25,7 +25,7 @@ Every example has one test for each scenario:
 | Object storage | S3 | Create a bucket, put an object, list and get it, delete both. |
 | Key-value table | DynamoDB | Create a table, wait until it is `ACTIVE`, put two items, get one, query both, delete the table. |
 | Queue | SQS | Create a queue, send a message, receive and delete it, delete the queue. |
-| Fan-out | SNS + SQS | Create a topic and a queue, allow the topic in the queue policy, subscribe with raw delivery, publish, receive the message. |
+| Fan-out | SNS + SQS | Create a topic and a queue, allow the topic in the queue policy, subscribe with raw delivery, publish, receive the message. Delivery is asynchronous, so the test polls the queue for up to 10 seconds in total. |
 | Secrets | Secrets Manager | Create a JSON secret, read it back, delete it. |
 
 ## Run an example on your computer
@@ -63,7 +63,7 @@ environment variables, which the start script sets:
 | `JAVA_TOOL_OPTIONS` | A truststore with the JDK CAs + emulator CA |
 | `AWS_REGION` | `us-east-1` |
 
-Two rules apply in every language:
+Three rules apply in every language:
 
 - S3 uses path-style addresses (`forcePathStyle`), because the endpoint is an IP address.
 - SQS calls must go to the emulator. The emulator returns queue URLs with the real AWS

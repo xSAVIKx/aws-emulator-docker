@@ -60,16 +60,18 @@ public class FanOutTests(EmulatorFixture aws)
 
             await aws.Sns.PublishAsync(new PublishRequest { TopicArn = topicArn, Message = "fan-out" }, ct);
 
-            // SNS delivers the message asynchronously. Use long polling and retry for about 10 s.
+            // SNS delivers the message asynchronously. Use long polling and retry for up to
+            // 10 s in total. Each long poll waits at most 2 s and not past the deadline.
             Message? message = null;
             var deadline = DateTime.UtcNow.AddSeconds(10);
             while (message is null && DateTime.UtcNow < deadline)
             {
+                var remaining = (int)(deadline - DateTime.UtcNow).TotalSeconds;
                 var received = await aws.Sqs.ReceiveMessageAsync(new ReceiveMessageRequest
                 {
                     QueueUrl = queueUrl,
                     MaxNumberOfMessages = 1,
-                    WaitTimeSeconds = 2,
+                    WaitTimeSeconds = Math.Clamp(remaining, 1, 2),
                 }, ct);
                 // In SDK v4, an empty response has a null list, not an empty list.
                 message = received.Messages?.FirstOrDefault();
@@ -81,10 +83,12 @@ public class FanOutTests(EmulatorFixture aws)
         finally
         {
             // Deleting the topic also deletes its subscriptions.
-            await aws.Sns.DeleteTopicAsync(new DeleteTopicRequest { TopicArn = topicArn }, CancellationToken.None);
+            await EmulatorFixture.CleanUpAsync("DeleteTopic", () =>
+                aws.Sns.DeleteTopicAsync(new DeleteTopicRequest { TopicArn = topicArn }, CancellationToken.None));
             if (queueUrl is not null)
             {
-                await aws.Sqs.DeleteQueueAsync(new DeleteQueueRequest { QueueUrl = queueUrl }, CancellationToken.None);
+                await EmulatorFixture.CleanUpAsync("DeleteQueue", () =>
+                    aws.Sqs.DeleteQueueAsync(new DeleteQueueRequest { QueueUrl = queueUrl }, CancellationToken.None));
             }
         }
     }

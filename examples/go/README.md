@@ -8,7 +8,8 @@ scenarios in the [examples README](../README.md#scenarios).
 ## Prerequisites
 
 - Docker.
-- Go 1.25 or later. The `go` directive in `go.mod` sets the minimum version.
+- Go 1.25 or later. The `go` directive in `go.mod` sets the minimum version. The
+  `toolchain` directive selects the newest Go 1.25 patch release when your Go is older.
 
 ## Run
 
@@ -59,9 +60,10 @@ reads these variables, which `with-emulator.sh` sets:
   The test passes the URL back unchanged. The Go SDK does not use the host of the queue
   URL as the endpoint. It sends every SQS request to `AWS_ENDPOINT_URL`, so you need no
   extra setting. (The request log shows `Host: 127.0.0.1:<port>` for all SQS calls.)
-- After a forced `DeleteSecret`, `GetSecretValue` fails. The emulator returns
-  `InvalidRequestException`, and real AWS returns `ResourceNotFoundException`. The test
-  checks only that the read fails.
+- After a forced `DeleteSecret`, `GetSecretValue` fails. The error can be
+  `ResourceNotFoundException` or `InvalidRequestException`. Real AWS can also return
+  `InvalidRequestException` right after the delete, because the deletion is asynchronous.
+  The test checks only that the read fails.
 - The emulator does not send the `X-Amz-Crc32` header on DynamoDB responses. The test
   sets `DisableValidateResponseChecksum`. Without it, the SDK logs a
   `failed to close HTTP response body` warning for each call.

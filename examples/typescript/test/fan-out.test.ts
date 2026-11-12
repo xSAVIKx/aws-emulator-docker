@@ -1,7 +1,13 @@
 // Scenario: Fan-out (SNS + SQS).
 //
 // SNS publishes to a topic. SQS receives a copy through a subscription.
-import { CreateTopicCommand, DeleteTopicCommand, PublishCommand, SNSClient, SubscribeCommand } from "@aws-sdk/client-sns";
+import {
+  CreateTopicCommand,
+  DeleteTopicCommand,
+  PublishCommand,
+  SNSClient,
+  SubscribeCommand,
+} from "@aws-sdk/client-sns";
 import {
   CreateQueueCommand,
   DeleteMessageCommand,
@@ -78,7 +84,7 @@ describe("fan-out (SNS + SQS)", () => {
     const text = JSON.stringify({ event: "order-created", id: 42 });
     await sns.send(new PublishCommand({ TopicArn: topicArn, Message: text }));
 
-    // Delivery is asynchronous. Poll for up to ~10 s.
+    // Delivery is asynchronous. Poll for up to 10 s in total.
     const message = await receiveOne(sqs, queueUrl!, 10_000);
     expect(message.Body).toBe(text);
     await sqs.send(new DeleteMessageCommand({ QueueUrl: queueUrl, ReceiptHandle: message.ReceiptHandle }));

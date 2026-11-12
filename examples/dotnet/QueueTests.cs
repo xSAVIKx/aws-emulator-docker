@@ -47,7 +47,8 @@ public class QueueTests(EmulatorFixture aws)
         }
         finally
         {
-            await aws.Sqs.DeleteQueueAsync(new DeleteQueueRequest { QueueUrl = queueUrl }, CancellationToken.None);
+            await EmulatorFixture.CleanUpAsync("DeleteQueue", () =>
+                aws.Sqs.DeleteQueueAsync(new DeleteQueueRequest { QueueUrl = queueUrl }, CancellationToken.None));
         }
     }
 }

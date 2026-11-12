@@ -51,6 +51,23 @@ public sealed class EmulatorFixture : IDisposable
     /// </summary>
     public static string UniqueName() => $"ex-net-{Guid.NewGuid():N}"[..15];
 
+    /// <summary>
+    /// Runs one clean-up step in a finally block. The step catches its own error, so a
+    /// failed step does not skip the next steps and does not hide the original assertion.
+    /// The test output shows the error.
+    /// </summary>
+    public static async Task CleanUpAsync(string step, Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception e)
+        {
+            TestContext.Current.TestOutputHelper?.WriteLine($"Clean-up step {step} failed: {e.Message}");
+        }
+    }
+
     private static void EnsureLocalEndpoint()
     {
         var value = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL");

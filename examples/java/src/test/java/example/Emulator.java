@@ -20,15 +20,34 @@ import org.junit.jupiter.api.extension.ExtensionContext;
  *   <li>{@code JAVA_TOOL_OPTIONS}: a truststore that trusts the emulator CA.
  * </ul>
  *
- * <p>Register this class with {@code @ExtendWith(Emulator.class)}. Before the first test of a
- * class, it stops the run if the endpoint is not local. This guard prevents a run against a
- * real AWS account.
+ * <p>JUnit registers this class for every test class. The file
+ * {@code src/test/resources/junit-platform.properties} turns on extension auto-detection, and
+ * {@code META-INF/services/org.junit.jupiter.api.extension.Extension} names this class. The
+ * check of the endpoint runs once for the whole run. If the endpoint is not local, every test
+ * class fails before its first test. This guard prevents a run against a real AWS account.
  */
 public final class Emulator implements BeforeAllCallback {
 
     @Override
     public void beforeAll(ExtensionContext context) {
-        requireLocalEndpoint();
+        // The root store is shared by all test classes, so the check runs only once.
+        // Each test class then gets the same result.
+        Object failure = context.getRoot()
+                .getStore(ExtensionContext.Namespace.create(Emulator.class))
+                .getOrComputeIfAbsent("endpoint-check", key -> checkEndpoint());
+        if (failure instanceof IllegalStateException e) {
+            throw e;
+        }
+    }
+
+    /** Returns the guard failure, or a string when the endpoint is local. */
+    private static Object checkEndpoint() {
+        try {
+            requireLocalEndpoint();
+            return "ok";
+        } catch (IllegalStateException e) {
+            return e;
+        }
     }
 
     /** Throws an exception unless AWS_ENDPOINT_URL points to 127.0.0.1 or localhost. */
@@ -47,11 +66,11 @@ public final class Emulator implements BeforeAllCallback {
     }
 
     /**
-     * Returns a name that is unique for this run, for example {@code ex-java-3f9c1a2b-queue}.
+     * Returns a name that is unique for this run, for example {@code ex-java-3f9c1a2b}.
      * The name is lowercase, so it is also a valid S3 bucket name.
      */
-    static String uniqueName(String suffix) {
+    static String uniqueName() {
         String random = UUID.randomUUID().toString().substring(0, 8);
-        return ("ex-java-" + random + "-" + suffix).toLowerCase(Locale.ROOT);
+        return ("ex-java-" + random).toLowerCase(Locale.ROOT);
     }
 }

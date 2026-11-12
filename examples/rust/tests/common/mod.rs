@@ -6,7 +6,10 @@
 #![allow(dead_code)]
 
 use std::collections::hash_map::RandomState;
+use std::fmt::Debug;
 use std::hash::{BuildHasher, Hasher};
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
+use std::task::Poll;
 
 use aws_config::SdkConfig;
 
@@ -52,15 +55,59 @@ fn host_of(url: &str) -> &str {
     host_port.split(':').next().unwrap_or("")
 }
 
-/// Returns a unique lowercase name such as `ex-rs-3f9a1c0b7d2e4a65`.
+/// Returns a unique lowercase name such as `ex-rs-3f9a1c0b`.
 ///
-/// Tests run in parallel, and many runs can share one emulator, so each
-/// resource gets its own name. The name is valid for S3 buckets, DynamoDB
-/// tables, SQS queues, SNS topics and secrets.
+/// Many runs can share one emulator, so each resource gets its own name.
+/// The name is valid for S3 buckets, DynamoDB tables, SQS queues, SNS topics
+/// and secrets.
 pub fn unique_name() -> String {
     // `RandomState` gets a random seed from the operating system. A hash of
     // nothing with that seed is a random 64-bit number, without an extra crate.
-    let random = RandomState::new().build_hasher().finish();
-    format!("ex-rs-{random:016x}")
+    // The name uses the low 32 bits as 8 hex characters.
+    let random = RandomState::new().build_hasher().finish() as u32;
+    format!("ex-rs-{random:08x}")
+}
+
+/// Runs the test body, then runs the cleanup also when the body panics.
+///
+/// The cleanup returns a list of failed cleanup steps. When the body panics,
+/// this function prints the failed steps and then continues the original
+/// panic, so the test reports the original assertion. When the body passes
+/// and a cleanup step failed, this function panics.
+pub async fn run_with_cleanup<T>(
+    body: impl Future<Output = T>,
+    cleanup: impl Future<Output = Vec<String>>,
+) -> T {
+    // Catch a panic in each poll of the body. This needs no extra crate.
+    let mut body = Box::pin(body);
+    let result = std::future::poll_fn(|cx| {
+        match catch_unwind(AssertUnwindSafe(|| body.as_mut().poll(cx))) {
+            Ok(Poll::Pending) => Poll::Pending,
+            Ok(Poll::Ready(value)) => Poll::Ready(Ok(value)),
+            Err(panic) => Poll::Ready(Err(panic)),
+        }
+    })
+    .await;
+
+    let failures = cleanup.await;
+    match result {
+        Ok(value) => {
+            assert!(failures.is_empty(), "cleanup failed: {failures:#?}");
+            value
+        }
+        Err(panic) => {
+            if !failures.is_empty() {
+                eprintln!("cleanup failed: {failures:#?}");
+            }
+            resume_unwind(panic)
+        }
+    }
+}
+
+/// Adds a failed cleanup step to `failures`. A step that passed adds nothing.
+pub fn note<T, E: Debug>(failures: &mut Vec<String>, step: &str, result: Result<T, E>) {
+    if let Err(error) = result {
+        failures.push(format!("{step}: {error:?}"));
+    }
 }
 

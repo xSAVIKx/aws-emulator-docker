@@ -7,14 +7,12 @@ import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.QueueDoesNotExistException;
 
 /** Queue scenario: create a queue, send a message, receive and delete it, delete the queue. */
-@ExtendWith(Emulator.class)
 class QueueTest {
 
     private static SqsClient sqs;
@@ -46,7 +44,7 @@ class QueueTest {
         // The emulator returns a URL like https://sqs.us-east-1.amazonaws.com/000000000000/<name>.
         // Use it as an identifier and give it back unchanged. The SDK still sends the request
         // to AWS_ENDPOINT_URL.
-        queueUrl = sqs.createQueue(b -> b.queueName(Emulator.uniqueName("queue"))).queueUrl();
+        queueUrl = sqs.createQueue(b -> b.queueName(Emulator.uniqueName())).queueUrl();
 
         sqs.sendMessage(b -> b.queueUrl(queueUrl).messageBody("hello from Java"));
 

@@ -6,18 +6,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
-import software.amazon.awssdk.services.secretsmanager.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.secretsmanager.model.SecretsManagerException;
 
 /** Secrets scenario: create a JSON secret, read it back, delete it. */
-@ExtendWith(Emulator.class)
 class SecretsTest {
 
     private static SecretsManagerClient secrets;
-    private static final String SECRET = Emulator.uniqueName("secret");
+    private static final String SECRET = Emulator.uniqueName();
+    private static boolean created;
+    private static boolean deleted;
 
     @BeforeAll
     static void createClient() {
@@ -30,9 +29,10 @@ class SecretsTest {
             return;
         }
         try {
-            deleteNow();
-        } catch (ResourceNotFoundException alreadyDeleted) {
-            // The test deleted the secret. There is nothing to do.
+            // Delete the secret only when the test created it and did not delete it.
+            if (created && !deleted) {
+                deleteNow();
+            }
         } finally {
             secrets.close();
         }
@@ -47,14 +47,17 @@ class SecretsTest {
     void createReadAndDeleteAJsonSecret() {
         String json = "{\"username\":\"app\",\"password\":\"s3cr3t\"}";
         secrets.createSecret(b -> b.name(SECRET).secretString(json));
+        created = true;
 
         String value = secrets.getSecretValue(b -> b.secretId(SECRET)).secretString();
         assertThat(value).isEqualTo(json);
 
         deleteNow();
+        deleted = true;
 
-        // After the delete, a read fails. The emulator returns InvalidRequestException here,
-        // not ResourceNotFoundException, so the test checks only the common parent class.
+        // After the delete, a read fails. The deletion is asynchronous, so right after the
+        // delete real AWS can also return InvalidRequestException instead of
+        // ResourceNotFoundException. The test checks only the common parent class.
         assertThatThrownBy(() -> secrets.getSecretValue(b -> b.secretId(SECRET)))
                 .isInstanceOf(SecretsManagerException.class);
     }

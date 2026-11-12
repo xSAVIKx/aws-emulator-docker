@@ -30,9 +30,13 @@ func TestObjectStorage(t *testing.T) {
 
 	_, err := client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String(bucket)})
 	require.NoError(t, err)
-	// Cleanup runs also when the test fails. The calls ignore errors, because
-	// the test can delete the object and the bucket itself.
+	// Cleanup runs also when the test fails. It deletes the object and the
+	// bucket only when the test did not delete them.
+	deleted := false
 	t.Cleanup(func() {
+		if deleted {
+			return
+		}
 		ctx := cleanupContext()
 		_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
 		_, _ = client.DeleteBucket(ctx, &s3.DeleteBucketInput{Bucket: aws.String(bucket)})
@@ -62,4 +66,5 @@ func TestObjectStorage(t *testing.T) {
 	require.NoError(t, err)
 	_, err = client.DeleteBucket(ctx, &s3.DeleteBucketInput{Bucket: aws.String(bucket)})
 	require.NoError(t, err)
+	deleted = true
 }

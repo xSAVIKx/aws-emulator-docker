@@ -82,14 +82,16 @@ func TestFanOut(t *testing.T) {
 	_, err = snsClient.Publish(ctx, &sns.PublishInput{TopicArn: topicArn, Message: aws.String(body)})
 	require.NoError(t, err)
 
-	// SNS delivers to the queue asynchronously. Poll for up to about 10 seconds.
+	// SNS delivers to the queue asynchronously. Poll for up to 10 seconds in
+	// total. Each long poll waits at most 2 seconds and not past the deadline.
 	var got []sqstypes.Message
 	deadline := time.Now().Add(10 * time.Second)
 	for len(got) == 0 && time.Now().Before(deadline) {
+		wait := int32(min(max(time.Until(deadline)/time.Second, 1), 2))
 		out, err := sqsClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 			QueueUrl:            queueURL,
 			MaxNumberOfMessages: 1,
-			WaitTimeSeconds:     2,
+			WaitTimeSeconds:     wait,
 		})
 		require.NoError(t, err)
 		got = out.Messages

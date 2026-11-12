@@ -6,4 +6,5 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 npm ci --no-audit --no-fund
 npm run typecheck
-npx vitest run --reporter verbose
+# Extra arguments go to Vitest, for example a test file name.
+npm test -- "$@"

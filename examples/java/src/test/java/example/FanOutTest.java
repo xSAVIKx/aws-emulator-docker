@@ -10,7 +10,6 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
@@ -21,7 +20,6 @@ import software.amazon.awssdk.services.sqs.model.QueueAttributeName;
  * Fan-out scenario: create a topic and a queue, allow the topic in the queue policy, subscribe
  * with raw delivery, publish, receive the message.
  */
-@ExtendWith(Emulator.class)
 class FanOutTest {
 
     private static SnsClient sns;
@@ -56,7 +54,7 @@ class FanOutTest {
 
     @Test
     void topicDeliversARawMessageToTheQueue() {
-        String name = Emulator.uniqueName("fanout");
+        String name = Emulator.uniqueName();
         topicArn = sns.createTopic(b -> b.name(name)).topicArn();
         queueUrl = sqs.createQueue(b -> b.queueName(name)).queueUrl();
         String queueArn = sqs.getQueueAttributes(b -> b
@@ -89,7 +87,7 @@ class FanOutTest {
 
         sns.publish(b -> b.topicArn(topicArn).message("order created"));
 
-        // Delivery is asynchronous. Poll the queue for up to about 10 seconds.
+        // Delivery is asynchronous. Poll the queue for up to 10 seconds in total.
         List<Message> messages = receiveWithin(Duration.ofSeconds(10));
         assertThat(messages).extracting(Message::body).containsExactly("order created");
     }
@@ -99,10 +97,13 @@ class FanOutTest {
         Instant deadline = Instant.now().plus(limit);
         List<Message> messages;
         do {
+            // Each long poll waits at most 2 seconds and not past the deadline.
+            long remaining = Duration.between(Instant.now(), deadline).toSeconds();
+            int waitSeconds = (int) Math.max(1, Math.min(2, remaining));
             messages = sqs.receiveMessage(b -> b
                     .queueUrl(queueUrl)
                     .maxNumberOfMessages(1)
-                    .waitTimeSeconds(2)).messages();
+                    .waitTimeSeconds(waitSeconds)).messages();
         } while (messages.isEmpty() && Instant.now().isBefore(deadline));
         return messages;
     }

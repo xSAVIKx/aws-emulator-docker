@@ -44,8 +44,13 @@ func TestKeyValueTable(t *testing.T) {
 		BillingMode: types.BillingModePayPerRequest,
 	})
 	require.NoError(t, err)
+	// Cleanup runs also when the test fails. It deletes the table only when
+	// the test did not delete it.
+	deleted := false
 	t.Cleanup(func() {
-		_, _ = client.DeleteTable(cleanupContext(), &dynamodb.DeleteTableInput{TableName: aws.String(table)})
+		if !deleted {
+			_, _ = client.DeleteTable(cleanupContext(), &dynamodb.DeleteTableInput{TableName: aws.String(table)})
+		}
 	})
 
 	// CreateTable returns the status CREATING. The waiter polls DescribeTable
@@ -96,4 +101,5 @@ func TestKeyValueTable(t *testing.T) {
 
 	_, err = client.DeleteTable(ctx, &dynamodb.DeleteTableInput{TableName: aws.String(table)})
 	require.NoError(t, err)
+	deleted = true
 }

@@ -8,9 +8,8 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
-import software.amazon.awssdk.core.retry.backoff.FixedDelayBackoffStrategy;
+import software.amazon.awssdk.retries.api.BackoffStrategy;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeDefinition;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -27,11 +26,10 @@ import software.amazon.awssdk.services.dynamodb.waiters.DynamoDbWaiter;
  * Key-value table scenario: create a table, wait until it is ACTIVE, put two items, get one,
  * query both, delete the table.
  */
-@ExtendWith(Emulator.class)
 class KeyValueTableTest {
 
     private static DynamoDbClient dynamo;
-    private static final String TABLE = Emulator.uniqueName("table");
+    private static final String TABLE = Emulator.uniqueName();
     /** True while the table exists. The clean-up step deletes the table only if it is true. */
     private static boolean tableExists;
 
@@ -64,7 +62,7 @@ class KeyValueTableTest {
         return DynamoDbWaiter.builder()
                 .client(dynamo)
                 .overrideConfiguration(o -> o
-                        .backoffStrategy(FixedDelayBackoffStrategy.create(Duration.ofSeconds(1)))
+                        .backoffStrategyV2(BackoffStrategy.fixedDelay(Duration.ofSeconds(1)))
                         .maxAttempts(60))
                 .build();
     }

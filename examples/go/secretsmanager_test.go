@@ -38,7 +38,14 @@ func TestSecrets(t *testing.T) {
 		})
 		return err
 	}
-	t.Cleanup(func() { _ = deleteSecret() })
+	// Cleanup runs also when the test fails. It deletes the secret only when
+	// the test did not delete it.
+	deleted := false
+	t.Cleanup(func() {
+		if !deleted {
+			_ = deleteSecret()
+		}
+	})
 
 	got, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: aws.String(name)})
 	require.NoError(t, err)
@@ -47,10 +54,11 @@ func TestSecrets(t *testing.T) {
 	require.Equal(t, want, creds)
 
 	require.NoError(t, deleteSecret())
+	deleted = true
 
-	// After the delete, a read fails. The test does not check the error type:
-	// real AWS returns ResourceNotFoundException, and the emulator returns
-	// InvalidRequestException right after a forced delete.
+	// After the delete, a read fails. The test does not check the error type.
+	// The deletion is asynchronous, so right after the delete real AWS can
+	// also return InvalidRequestException instead of ResourceNotFoundException.
 	_, err = client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: aws.String(name)})
 	require.Error(t, err)
 }

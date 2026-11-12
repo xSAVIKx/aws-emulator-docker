@@ -29,6 +29,8 @@ If an emulator runs already and your shell has its environment, run
 | `pom.xml` | Imports the AWS SDK BOM and the JUnit BOM. Pins the plugin versions. |
 | `run-tests.sh` | Runs `mvn -B -ntp test` in this directory. |
 | `src/test/java/example/Emulator.java` | A JUnit extension. It stops the run if `AWS_ENDPOINT_URL` is not local. It also makes unique names. |
+| `src/test/resources/junit-platform.properties` | Turns on JUnit extension auto-detection. |
+| `src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension` | Registers `Emulator` for every test class. |
 | `IdentityTest.java` | STS `GetCallerIdentity` returns account `000000000000`. |
 | `ObjectStorageTest.java` | S3: bucket and object, with path-style addresses. |
 | `KeyValueTableTest.java` | DynamoDB: table, waiter, put, get, query. |
@@ -47,7 +49,7 @@ The tests contain no endpoint, keys or certificate paths. Each client comes from
 
 S3 uses `forcePathStyle(true)`, because the endpoint is an IP address.
 
-Each resource name contains `ex-java-` and a random part. Each test class deletes its
+Each resource name is `ex-java-` and 8 random hex characters. Each test class deletes its
 resources in an `@AfterAll` method, also when the test fails.
 
 ## TLS and the truststore
@@ -73,7 +75,9 @@ public CA, and Maven fails on downloads with `PKIX path building failed`.
   requests to the URL host. (The AWS SDK for JavaScript v3 does, unless you set
   `useQueueUrlAsEndpoint: false`.) The queue test shows this: the message that it receives
   can only come from the emulator.
-- Right after `DeleteSecret` with `forceDeleteWithoutRecovery(true)`, `GetSecretValue`
-  fails with `InvalidRequestException`, not `ResourceNotFoundException`. The test checks
-  only that the read fails.
-- SNS delivers to SQS asynchronously. The fan-out test polls the queue for up to 10 seconds.
+- After `DeleteSecret` with `forceDeleteWithoutRecovery(true)`, `GetSecretValue` fails.
+  The error can be `ResourceNotFoundException` or `InvalidRequestException`. Real AWS can
+  also return `InvalidRequestException` right after the delete, because the deletion is
+  asynchronous. The test checks only that the read fails.
+- SNS delivers to SQS asynchronously. The fan-out test polls the queue for up to 10 seconds
+  in total.

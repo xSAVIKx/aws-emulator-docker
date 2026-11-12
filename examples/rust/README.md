@@ -6,8 +6,8 @@ Tokio (`#[tokio::test]`). It runs the six scenarios in [`../README.md`](../READM
 ## Prerequisites
 
 - Docker.
-- Rust stable with Cargo. The example uses edition 2024, so it needs Rust 1.85 or later.
-  Install Rust with [rustup](https://rustup.rs/).
+- Rust with Cargo. Install Rust with [rustup](https://rustup.rs/). `rust-toolchain.toml`
+  pins the Rust version, and rustup installs that version on the first run.
 - A C compiler (`cc`). The default TLS library of the SDK (`aws-lc-rs`) compiles C code.
 
 ## Run
@@ -20,24 +20,25 @@ examples/with-emulator.sh examples/rust/run-tests.sh
 
 The first build downloads and compiles the dependencies. This takes some minutes.
 
-`run-tests.sh` runs `cargo test --locked -- --nocapture`. The tests run in parallel.
-Each test makes resources with a unique name (`ex-rs-<random>`) and deletes them at the end.
+`run-tests.sh` runs `cargo test --locked -- --nocapture`. Each file in `tests/` is a
+separate test binary, and Cargo runs the binaries one after another. Each test makes
+resources with a unique name (`ex-rs-<8 hex characters>`). Each test deletes its resources
+at the end, also when an assertion fails (`common::run_with_cleanup`).
 
 ## Files
 
 | File | Content |
 |---|---|
 | `Cargo.toml`, `Cargo.lock` | The pinned dependencies: `aws-config` and one SDK crate for each service. |
+| `rust-toolchain.toml` | The pinned Rust version. |
 | `run-tests.sh` | The test command. |
-| `tests/common/mod.rs` | Shared helpers: the endpoint guard, the SDK configuration, unique names. |
+| `tests/common/mod.rs` | Shared helpers: the endpoint guard, the SDK configuration, unique names, cleanup. |
 | `tests/sts.rs` | Identity: `GetCallerIdentity`. |
 | `tests/s3.rs` | Object storage, with path-style addresses (`force_path_style(true)`). |
 | `tests/dynamodb.rs` | Key-value table, with the `wait_until_table_exists` waiter. |
 | `tests/sqs.rs` | Queue. |
 | `tests/sns_sqs.rs` | Fan-out from an SNS topic to an SQS queue. |
 | `tests/secretsmanager.rs` | Secrets. |
-
-Each file in `tests/` compiles to its own test binary.
 
 ## How the tests connect
 

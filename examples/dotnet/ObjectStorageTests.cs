@@ -39,8 +39,10 @@ public class ObjectStorageTests(EmulatorFixture aws)
         finally
         {
             // Clean up also when an assertion fails. S3 deletes only an empty bucket.
-            await aws.S3.DeleteObjectAsync(new DeleteObjectRequest { BucketName = bucket, Key = key }, CancellationToken.None);
-            await aws.S3.DeleteBucketAsync(new DeleteBucketRequest { BucketName = bucket }, CancellationToken.None);
+            await EmulatorFixture.CleanUpAsync("DeleteObject", () =>
+                aws.S3.DeleteObjectAsync(new DeleteObjectRequest { BucketName = bucket, Key = key }, CancellationToken.None));
+            await EmulatorFixture.CleanUpAsync("DeleteBucket", () =>
+                aws.S3.DeleteBucketAsync(new DeleteBucketRequest { BucketName = bucket }, CancellationToken.None));
         }
     }
 }

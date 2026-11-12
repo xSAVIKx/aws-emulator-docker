@@ -5,4 +5,6 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 export DOTNET_CLI_TELEMETRY_OPTOUT="${DOTNET_CLI_TELEMETRY_OPTOUT:-1}"
 export DOTNET_NOLOGO="${DOTNET_NOLOGO:-1}"
-dotnet test --logger "console;verbosity=normal"
+# --locked-mode: restore the exact versions in packages.lock.json, or fail.
+dotnet restore --locked-mode
+dotnet test --no-restore --logger "console;verbosity=normal" "$@"

@@ -32,7 +32,8 @@ public class KeyValueTableTests(EmulatorFixture aws)
         }, ct);
         try
         {
-            // CreateTable returns CREATING. Poll until the table is ACTIVE.
+            // CreateTable returns CREATING. Poll until the table is ACTIVE. The AWS SDK for
+            // .NET v4 has no DynamoDB waiter, so the test polls DescribeTable itself.
             await WaitUntilActiveAsync(table, ct);
 
             foreach (var (sk, name) in new[] { ("1", "first"), ("2", "second") })
@@ -76,7 +77,8 @@ public class KeyValueTableTests(EmulatorFixture aws)
         }
         finally
         {
-            await aws.DynamoDb.DeleteTableAsync(new DeleteTableRequest { TableName = table }, CancellationToken.None);
+            await EmulatorFixture.CleanUpAsync("DeleteTable", () =>
+                aws.DynamoDb.DeleteTableAsync(new DeleteTableRequest { TableName = table }, CancellationToken.None));
         }
     }
 

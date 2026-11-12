@@ -38,8 +38,9 @@ public class SecretsTests(EmulatorFixture aws)
             }, ct);
             deleted = true;
 
-            // A read after the delete fails. The emulator returns InvalidRequestException and
-            // not ResourceNotFoundException, so the test checks only the common base type.
+            // A read after the delete fails. The deletion is asynchronous, so right after the
+            // delete real AWS can also return InvalidRequestException instead of
+            // ResourceNotFoundException. The test checks only the common base type.
             await Assert.ThrowsAnyAsync<AmazonSecretsManagerException>(() =>
                 aws.SecretsManager.GetSecretValueAsync(new GetSecretValueRequest { SecretId = name }, ct));
         }
@@ -48,11 +49,12 @@ public class SecretsTests(EmulatorFixture aws)
             // Clean up when an assertion failed before the delete.
             if (!deleted)
             {
-                await aws.SecretsManager.DeleteSecretAsync(new DeleteSecretRequest
-                {
-                    SecretId = name,
-                    ForceDeleteWithoutRecovery = true,
-                }, CancellationToken.None);
+                await EmulatorFixture.CleanUpAsync("DeleteSecret", () =>
+                    aws.SecretsManager.DeleteSecretAsync(new DeleteSecretRequest
+                    {
+                        SecretId = name,
+                        ForceDeleteWithoutRecovery = true,
+                    }, CancellationToken.None));
             }
         }
     }

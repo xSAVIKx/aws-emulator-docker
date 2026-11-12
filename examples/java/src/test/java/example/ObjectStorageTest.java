@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -15,11 +14,10 @@ import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
 /** Object storage scenario: create a bucket, put an object, list and get it, delete both. */
-@ExtendWith(Emulator.class)
 class ObjectStorageTest {
 
     private static S3Client s3;
-    private static final String BUCKET = Emulator.uniqueName("bucket");
+    private static final String BUCKET = Emulator.uniqueName();
     private static final String KEY = "greetings/hello.txt";
 
     @BeforeAll

@@ -20,7 +20,9 @@ examples/with-emulator.sh examples/typescript/run-tests.sh
 ```
 
 The script starts a fresh emulator, runs the tests, and stops the emulator.
-`run-tests.sh` runs `npm ci`, then `tsc --noEmit`, then `vitest run`.
+`run-tests.sh` runs `npm ci`, then `tsc --noEmit`, then `vitest run` (the `npm test`
+script). Extra arguments go to Vitest, for example
+`examples/typescript/run-tests.sh test/queue.test.ts`.
 
 ## Files
 

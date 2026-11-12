@@ -20,7 +20,7 @@ examples/with-emulator.sh examples/python/run-tests.sh
 ```
 
 The script starts a fresh emulator, runs the tests, and stops the emulator.
-`run-tests.sh` runs `uv run --frozen pytest -v`. Extra arguments go to pytest, for
+`run-tests.sh` runs `uv run --locked pytest -v`. Extra arguments go to pytest, for
 example `examples/python/run-tests.sh -k queue`.
 
 ## Files
@@ -28,7 +28,7 @@ example `examples/python/run-tests.sh -k queue`.
 | File | Purpose |
 |---|---|
 | `pyproject.toml` | The project, the pinned versions of Boto3 and pytest, and pytest settings. |
-| `uv.lock` | The exact versions of all packages. `--frozen` uses this file unchanged. |
+| `uv.lock` | The exact versions of all packages. `--locked` uses this file and stops if it does not match `pyproject.toml`. |
 | `.python-version` | The Python version that uv uses. |
 | `run-tests.sh` | The entry point for local runs and for CI. |
 | `tests/conftest.py` | The endpoint guard, one Boto3 client per service, and the `unique_name` fixture. |

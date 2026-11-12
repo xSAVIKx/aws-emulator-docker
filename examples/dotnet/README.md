@@ -16,7 +16,8 @@ From the repository root:
 examples/with-emulator.sh examples/dotnet/run-tests.sh
 ```
 
-The script starts a fresh emulator, runs `dotnet test`, and stops the emulator.
+The script starts a fresh emulator, runs `dotnet restore --locked-mode` and
+`dotnet test --no-restore`, and stops the emulator. Extra arguments go to `dotnet test`.
 
 ## Files
 
@@ -25,6 +26,7 @@ The script starts a fresh emulator, runs `dotnet test`, and stops the emulator.
 | `global.json` | The .NET SDK version. |
 | `Directory.Packages.props` | All package versions (central package management). |
 | `AwsEmulator.Examples.csproj` | The test project. |
+| `packages.lock.json` | The exact versions of all packages, also the transitive packages. |
 | `EmulatorFixture.cs` | The endpoint guard, the AWS clients and the unique names. All tests share it. |
 | `IdentityTests.cs` | STS: `GetCallerIdentity`. |
 | `ObjectStorageTests.cs` | S3: bucket and object. |
@@ -32,7 +34,7 @@ The script starts a fresh emulator, runs `dotnet test`, and stops the emulator.
 | `QueueTests.cs` | SQS: send, receive, delete. |
 | `FanOutTests.cs` | SNS to SQS with raw delivery. |
 | `SecretsTests.cs` | Secrets Manager: JSON secret. |
-| `run-tests.sh` | Runs `dotnet test`. |
+| `run-tests.sh` | Restores the locked packages and runs `dotnet test`. |
 
 ## How the clients connect
 
@@ -45,7 +47,8 @@ The S3 client uses `ForcePathStyle = true`, because the endpoint is an IP addres
 `localhost`. This guard prevents a run against a real AWS account.
 
 Each test uses a unique name such as `ex-net-3f9a1c2b`, and deletes its resources in a
-`finally` block.
+`finally` block. Each delete catches its own error, so a failed delete does not skip the
+other deletes and does not hide the original assertion.
 
 ## TLS
 
@@ -60,12 +63,14 @@ NuGet, and the tests trust the emulator. Without `SSL_CERT_FILE`, the requests f
 - The project uses the `xunit.v3.mtp-off` package. With this package, `dotnet test` uses
   VSTest, and the `--logger` option works. The default `xunit.v3` 4.x package uses
   Microsoft.Testing.Platform, which the .NET 10 `dotnet test` rejects in VSTest mode.
-- `CreateTable` returns `CREATING`. The test polls `DescribeTable` until the table is `ACTIVE`.
+- `CreateTable` returns `CREATING`. The AWS SDK for .NET v4 has no DynamoDB waiter. Thus
+  the test polls `DescribeTable` until the table is `ACTIVE`.
 - The emulator returns SQS queue URLs with the host `sqs.us-east-1.amazonaws.com`. The test
   passes the URL back unchanged. The AWS SDK for .NET v4 sends all SQS requests to
   `AWS_ENDPOINT_URL`, not to the host in the queue URL. No extra setting is necessary.
   The receive step proves this: it returns the message that the test sent.
 - In SDK v4, an empty list in a response is `null`, not an empty list.
-- Right after `DeleteSecret` with `ForceDeleteWithoutRecovery`, the emulator answers
-  `GetSecretValue` with `InvalidRequestException`, not `ResourceNotFoundException`. The
-  test checks only that the read fails (`AmazonSecretsManagerException`).
+- After `DeleteSecret` with `ForceDeleteWithoutRecovery`, `GetSecretValue` fails. The
+  error can be `ResourceNotFoundException` or `InvalidRequestException`. Real AWS can also
+  return `InvalidRequestException` right after the delete, because the deletion is
+  asynchronous. The test checks only that the read fails (`AmazonSecretsManagerException`).

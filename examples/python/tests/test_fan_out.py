@@ -4,15 +4,19 @@ import json
 import time
 
 
-def receive_one(sqs, queue_url, timeout_seconds=30):
+def receive_one(sqs, queue_url, timeout_seconds=10):
     """Long-poll the queue until one message arrives or the time ends.
 
     SNS delivers asynchronously, so the first receive can be empty.
+    The total wait is timeout_seconds. Each long poll waits at most
+    the remaining time.
     """
     deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
+    while (remaining := deadline - time.monotonic()) > 0:
         response = sqs.receive_message(
-            QueueUrl=queue_url, MaxNumberOfMessages=1, WaitTimeSeconds=10
+            QueueUrl=queue_url,
+            MaxNumberOfMessages=1,
+            WaitTimeSeconds=max(1, min(5, int(remaining))),
         )
         if response.get("Messages"):
             return response["Messages"][0]
@@ -21,8 +25,11 @@ def receive_one(sqs, queue_url, timeout_seconds=30):
 
 def test_topic_delivers_to_queue(sns, sqs, unique_name):
     topic_arn = sns.create_topic(Name=unique_name)["TopicArn"]
-    queue_url = sqs.create_queue(QueueName=unique_name)["QueueUrl"]
+    queue_url = None
     try:
+        # Create the queue inside the try block. If CreateQueue fails,
+        # the finally block still deletes the topic.
+        queue_url = sqs.create_queue(QueueName=unique_name)["QueueUrl"]
         queue_arn = sqs.get_queue_attributes(
             QueueUrl=queue_url, AttributeNames=["QueueArn"]
         )["Attributes"]["QueueArn"]
@@ -60,5 +67,8 @@ def test_topic_delivers_to_queue(sns, sqs, unique_name):
         sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=message["ReceiptHandle"])
         sns.unsubscribe(SubscriptionArn=subscription_arn)
     finally:
-        sqs.delete_queue(QueueUrl=queue_url)
-        sns.delete_topic(TopicArn=topic_arn)
+        try:
+            if queue_url is not None:
+                sqs.delete_queue(QueueUrl=queue_url)
+        finally:
+            sns.delete_topic(TopicArn=topic_arn)
