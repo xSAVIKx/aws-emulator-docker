@@ -2,18 +2,18 @@
 
 > Unofficial, signed, multi-arch (linux/amd64, linux/arm64) container image of the AWS Emulator (https://github.com/aws/aws-emulator), a local emulator of the AWS APIs. Current upstream version: __VERSION__. Maintained by Yurii Serhiichuk (https://serhiichuk.dev). Not affiliated with Amazon Web Services.
 
-AWS does not publish a prebuilt image. This project builds one from the pinned, signature-checked upstream RPM or DEB package, tests it on both architectures, signs it with cosign (with SBOM and SLSA provenance), and publishes it within one hour of each upstream release.
+AWS does not publish a prebuilt image. This project builds one from the pinned upstream RPM or DEB package. The build checks the package signature. The project tests the image on both architectures. It signs the image with cosign and adds an SBOM and SLSA provenance. A workflow checks for a new upstream release every hour. It publishes a new image in about one to two hours.
 
 ## Images
 
 - `ghcr.io/xsavikx/aws-emulator`, `docker.io/xsavikx/aws-emulator`, `quay.io/xsavikx/aws-emulator`
-- Tags: `latest`, `lts`, `__VERSION__` (package version), `1.0`, `1`, immutable build tags `__VERSION__-<yyyymmdd>.<run>`; Debian variant with the `-debian` suffix and `debian`; distroless variant (no shell) with the `-distroless` suffix and `distroless`.
+- Tags: `latest`, `lts`, `__VERSION__` (package version), `__VERSION_SHORT__` (emulator version), `1.0`, `1`, immutable build tags `__VERSION__-<yyyymmdd>.<run>`; Debian variant with the `-debian` suffix and `debian`; distroless variant (no shell) with the `-distroless` suffix and `distroless`.
 
 ## Quick start
 
 ```sh
 mkdir -p ~/.aws/emulator
-docker run --rm --memory=2g -p 127.0.0.1:9297:9297 \
+docker run --rm --memory=2g --memory-swap=2g -p 127.0.0.1:9297:9297 \
   --user "$(id -u):$(id -g)" \
   -e HOME="$HOME" -v "$HOME/.aws/emulator:$HOME/.aws/emulator" \
   ghcr.io/xsavikx/aws-emulator -p 9297
@@ -21,7 +21,10 @@ export AWS_ENDPOINT_URL=https://127.0.0.1:9297
 export AWS_SHARED_CREDENTIALS_FILE=~/.aws/emulator/9297/emulator_credentials
 export AWS_CONFIG_FILE=~/.aws/emulator/9297/config
 export AWS_CA_BUNDLE=~/.aws/emulator/9297/ca.pem
-export AWS_REGION=us-east-1
+export AWS_EC2_METADATA_DISABLED=true
+export AWS_DISABLE_HOST_PREFIX_INJECTION=true
+export AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1
+unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_PROFILE
 aws sts get-caller-identity   # Account 000000000000
 ```
 
@@ -35,17 +38,18 @@ aws sts get-caller-identity   # Account 000000000000
 - AWS SDK for JavaScript v3: set `useQueueUrlAsEndpoint: false` on SQSClient, or SQS requests go to real AWS.
 - Other containers cannot reach the emulator by service name: the certificate names only localhost, 127.0.0.1 and ::1.
 - All state is in memory. Give the container 2 GiB.
+- Verify the signature: `cosign verify ghcr.io/xsavikx/aws-emulator:latest --certificate-identity 'https://github.com/xSAVIKx/aws-emulator-docker/.github/workflows/release.yml@refs/heads/main' --certificate-oidc-issuer https://token.actions.githubusercontent.com` (cosign v3 or later).
 
 ## GitHub Action
 
-- [Run AWS Emulator on the GitHub Marketplace](https://github.com/marketplace/actions/run-aws-emulator): `- uses: xSAVIKx/run-aws-emulator@v1` starts the image, waits until healthy, and sets AWS_ENDPOINT_URL, credentials and CA variables for the next steps. Runs on Ubuntu 22.04, 24.04 and 26.04 (x64 and arm64) and on self-hosted Linux with Docker or Podman.
+- [Run AWS Emulator on the GitHub Marketplace](https://github.com/marketplace/actions/run-aws-emulator): `- uses: xSAVIKx/run-aws-emulator@v1` starts the image, waits until healthy, and sets AWS_ENDPOINT_URL, credentials and CA variables for the next steps. Works on Linux runners with Docker or Podman, x64 and arm64. Use a `-debian` or `-distroless` tag in the `image` input for another variant.
 
 ## Docs
 
 - [Website](https://xsavikx.github.io/aws-emulator-docker/): quick start, facts, examples, action, tags, verification, FAQ, release notes
 - [Source repository](https://github.com/xSAVIKx/aws-emulator-docker): Dockerfiles, CI, tests
 - [Examples](https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples): Python pytest, TypeScript Vitest, Java JUnit 5, Go, C# xUnit, Rust
-- [Running AWS Emulator in Docker, on any arch, in CI](https://serhiichuk.dev/blog/aws-emulator-container-image/): write-up with docker run, Compose, GitHub Actions and the gotchas
+- [Running AWS Emulator in Docker, on any arch, in CI](https://serhiichuk.dev/blog/aws-emulator-container-image/): blog post about docker run, Compose, GitHub Actions and known problems
 - [Releases](https://github.com/xSAVIKx/aws-emulator-docker/releases): image digests and upstream changes per version
 - [Action source](https://github.com/xSAVIKx/run-aws-emulator)
 

@@ -7,15 +7,18 @@
 
 Website: <https://xsavikx.github.io/aws-emulator-docker/>
 
-A ready-to-run, multi-architecture container image of the
+This project publishes a multi-architecture container image of the
 [AWS Emulator](https://github.com/aws/aws-emulator), a local emulator of the AWS APIs.
+You can run the image immediately. You do not build it first.
 
 AWS does not publish a prebuilt image. The
 [official guide](https://docs.aws.amazon.com/emulator/latest/userguide/getting-started-docker.html)
 tells you to build one yourself. This project builds that image, tests it, signs it, and
 publishes it for you. A scheduled workflow checks for a new upstream release every hour.
+After a new upstream release, the workflow usually publishes a new image in about one to two
+hours.
 
-Write-up with `docker run`, Compose, GitHub Actions and the gotchas:
+A blog post about `docker run`, Compose, GitHub Actions and known problems:
 [Running AWS Emulator in Docker, on any arch, in CI](https://serhiichuk.dev/blog/aws-emulator-container-image/)
 
 > This is an unofficial community project. It is not affiliated with or endorsed by
@@ -38,9 +41,9 @@ Podman, containerd and Kubernetes on Linux run them natively.
 | Tag | Meaning |
 |---|---|
 | `latest`, `lts` | The newest LTS release |
-| `1.0.322.1-<yyyymmdd>.<run>` | One build. This tag never moves. |
-| `1.0.322.1` | The exact upstream package version |
-| `1.0.322` | The emulator version (as `aws-emulator --version` reports it) |
+| `<version>-<yyyymmdd>.<run>` | One build. This tag never moves. |
+| `<version>` | The exact upstream package version, for example `1.0.322.1` |
+| `<emulator-version>` | The emulator version (as `aws-emulator --version` reports it), for example `1.0.322` |
 | `1.0`, `1` | The newest release in that line |
 | `sha-<commit>` | The build from one commit of this repository |
 
@@ -48,19 +51,22 @@ Podman, containerd and Kubernetes on Linux run them natively.
 
 | Variant | Base image | Tags |
 |---|---|---|
-| Amazon Linux (default) | `amazonlinux:2023-minimal` | `latest`, `1.0.322.1`, ... |
-| Debian | `debian:trixie-slim` (Debian 13) | `debian`, `latest-debian`, `1.0.322.1-debian`, `1.0-debian`, ... |
-| Distroless | `gcr.io/distroless/cc-debian13` | `distroless`, `latest-distroless`, `1.0.322.1-distroless`, ... |
+| Amazon Linux (default) | `public.ecr.aws/amazonlinux/amazonlinux:2023-minimal` | `latest`, `<version>`, ... |
+| Debian | `debian:trixie-slim` (Debian 13) | `debian`, `latest-debian`, `<version>-debian`, `1.0-debian`, ... |
+| Distroless | `gcr.io/distroless/cc-debian13` | `distroless`, `latest-distroless`, `<version>-distroless`, ... |
 
-Each tag of the default variant has a Debian twin with the `-debian` suffix. Both variants
-install the same upstream emulator: the Amazon Linux variant from the `.rpm` package, the
-Debian variant from the `.deb` package. Both have the same entry point, user, port and
-health check. Use the Debian variant if your tooling expects `apt` and Debian.
+Each tag of the default variant has a matching tag with the `-debian` suffix and a matching
+tag with the `-distroless` suffix. The three variants install the same upstream emulator.
+The Amazon Linux variant installs it from the `.rpm` package. The Debian and distroless
+variants install it from the `.deb` package. The three variants use the same user (UID 1000),
+port and health check route. Use the Debian variant if your tooling expects `apt` and Debian.
 
 The distroless variant contains only glibc, the emulator and a small static health check
-program. It has no shell, no package manager and no `curl`, so security scanners report
-very few findings. You cannot `docker exec` a shell into it. Its Docker `HEALTHCHECK` works
-the same way as in the other variants.
+program in Go. It has no shell, no package manager and no `curl`, so security scanners
+report very few findings. You cannot `docker exec` a shell into it. Its Docker `HEALTHCHECK`
+runs the Go program. The other two variants run a shell script with `curl`. The entry point
+of the distroless variant is `/opt/aws-emulator/bin/aws-emulator -b 0.0.0.0`. The other two
+variants use `aws-emulator -b 0.0.0.0`.
 
 The version tags move when the image is rebuilt (for example for a base image fix). For
 reproducible builds, pin a build tag or a digest. Each build is listed in the
@@ -129,7 +135,8 @@ UID_GID="$(id -u):$(id -g)" docker compose up
 
 - [`examples/`](examples/) has integration tests in Python (pytest), TypeScript (Vitest),
   Java (JUnit 5), Go (`go test`), C# (xUnit) and Rust (`cargo test`). They cover STS, S3,
-  DynamoDB, SQS, SNS to SQS and Secrets Manager. CI runs them on amd64 and arm64.
+  DynamoDB, SQS, SNS to SQS and Secrets Manager. CI runs them on amd64 and arm64 every day
+  and after each image release.
 - The [Run AWS Emulator](https://github.com/marketplace/actions/run-aws-emulator) GitHub Action ([source](https://github.com/xSAVIKx/run-aws-emulator)) starts
   the emulator in your own workflow and sets the SDK environment:
 
@@ -164,9 +171,9 @@ UID_GID="$(id -u):$(id -g)" docker compose up
   `::1`. A client in another container that calls `https://aws-emulator:9297` fails TLS
   validation. Run the client in the network namespace of the emulator instead
   (`docker run --network container:<emulator> ...` with `https://127.0.0.1:<port>`).
-- **Use `127.0.0.1`, not `localhost`.** With a host name, some SDKs (for example the AWS SDK
-  for JavaScript v3) use virtual-hosted S3 addresses such as `bucket.localhost`, which do not
-  resolve.
+- **Use `127.0.0.1`, not `localhost`.** With a host name, some SDKs use virtual-hosted S3
+  addresses such as `bucket.localhost`. These addresses do not resolve. The AWS SDK for
+  JavaScript v3 is an example of such an SDK.
 - **No Windows containers.** The emulator runs only on Linux. On Windows, use Linux
   containers (Docker Desktop with WSL 2).
 
@@ -181,18 +188,21 @@ Every published image has:
 - A keyless [cosign](https://github.com/sigstore/cosign) signature.
 - A GitHub artifact attestation (GHCR).
 
-The build downloads a pinned upstream version (from `versions.json`), checks the SHA-256
-digest of each RPM, and checks the RPM signature with the AWS package signing key
-(`SSM Publishing <ssm-publishing@amazon.com>`, fingerprint
-`98BC F336 A3BE 53B7 34E9 67C5 2E5B F49B D940 F624`, from
-<https://downloads.aws.com/keys/gpg/current.asc>, stored in [`keys/`](keys/)). The base image
-is pinned by digest.
+The build downloads a pinned upstream version (from `versions.json`). It checks the SHA-256
+digest of each package. It checks the RPM or DEB package signature with the AWS package
+signing key:
+
+- Signer: `SSM Publishing <ssm-publishing@amazon.com>`
+- Fingerprint: `98BC F336 A3BE 53B7 34E9 67C5 2E5B F49B D940 F624`
+- Source: <https://downloads.aws.com/keys/gpg/current.asc>, stored in [`keys/`](keys/)
+
+Each base image is pinned by digest.
 
 Verify a signature (cosign v3 or later; v2 reports "no signatures found"):
 
 ```sh
 cosign verify ghcr.io/xsavikx/aws-emulator:latest \
-  --certificate-identity-regexp '^https://github.com/xSAVIKx/aws-emulator-docker/' \
+  --certificate-identity 'https://github.com/xSAVIKx/aws-emulator-docker/.github/workflows/release.yml@refs/heads/main' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
@@ -204,18 +214,32 @@ gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx
 
 ## Build it yourself
 
+For a local test, build for the platform of your host and load the image into Docker
+with `--load`:
+
 ```sh
-docker buildx build --platform linux/amd64,linux/arm64 -t aws-emulator .
-docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile.debian -t aws-emulator:debian .
-docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile.distroless -t aws-emulator:distroless .
+docker buildx build --load -t aws-emulator:dev .
+docker buildx build --load -f Dockerfile.debian -t aws-emulator:dev-debian .
+docker buildx build --load -f Dockerfile.distroless -t aws-emulator:dev-distroless .
+tests/smoke.sh aws-emulator:dev
 ```
 
-The Dockerfile downloads the pinned LTS RPM for each target architecture and checks its
-signature (the Debian variant checks the detached `.sig` file with `gpg`). To build another version, pass `--build-arg EMULATOR_VERSION=<version>` with a
-version from
+A multi-platform build needs `--push` to a registry. Without `--load` or `--push`, the build
+keeps the result only in the build cache, and Docker has no local image:
+
+```sh
+docker buildx build --platform linux/amd64,linux/arm64 --push -t <registry>/aws-emulator:dev .
+```
+
+Each Dockerfile downloads the pinned LTS package for each target architecture. The Amazon
+Linux variant checks the signature of the `.rpm` package with `rpmkeys`. The Debian and
+distroless variants check the detached `.sig` file of the `.deb` package with `gpg`.
+
+To build another version, pass `--build-arg EMULATOR_VERSION=<version>`. Use a version from
 [`versions.json`](https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/versions.json),
-or `latest`. Pass `--build-arg RPM_SHA256_AMD64=<sha>` and `--build-arg RPM_SHA256_ARM64=<sha>` (`DEB_SHA256_*` for Debian)
-to also check the SHA-256 digests. Run the tests with `tests/smoke.sh aws-emulator`.
+or `latest`. To also check the SHA-256 digests, pass `--build-arg RPM_SHA256_AMD64=<sha>` and
+`--build-arg RPM_SHA256_ARM64=<sha>`. For the Debian and distroless variants, pass
+`DEB_SHA256_AMD64` and `DEB_SHA256_ARM64` instead.
 
 ## Licenses
 
@@ -223,7 +247,8 @@ to also check the SHA-256 digests. Run the tests with `tests/smoke.sh aws-emulat
   Copyright 2026 Yurii Serhiichuk.
 - The AWS Emulator: CC0 1.0 Universal, with code in its `vendor/` directory under the
   Apache License 2.0. See [aws/aws-emulator](https://github.com/aws/aws-emulator).
-- Amazon Linux 2023 and Debian base images: see their package licenses.
+- The base images `public.ecr.aws/amazonlinux/amazonlinux:2023-minimal`, `debian:trixie-slim`
+  and `gcr.io/distroless/cc-debian13`: see the licenses of their packages.
 
 ## Author
 

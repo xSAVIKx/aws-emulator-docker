@@ -184,7 +184,7 @@
      "name": "How do I run the AWS Emulator in Docker?",
      "acceptedAnswer": {
       "@type": "Answer",
-      "text": "Create ~/.aws/emulator, then run: docker run --rm -p 127.0.0.1:9297:9297 --user \"$(id -u):$(id -g)\" -e HOME=\"$HOME\" -v \"$HOME/.aws/emulator:$HOME/.aws/emulator\" ghcr.io/xsavikx/aws-emulator -p 9297. Then set AWS_ENDPOINT_URL=https://127.0.0.1:9297 and the other variables from the quick start."
+      "text": "Create ~/.aws/emulator, then run: docker run --rm --memory=2g --memory-swap=2g -p 127.0.0.1:9297:9297 --user \"$(id -u):$(id -g)\" -e HOME=\"$HOME\" -v \"$HOME/.aws/emulator:$HOME/.aws/emulator\" ghcr.io/xsavikx/aws-emulator -p 9297. Then set AWS_ENDPOINT_URL=https://127.0.0.1:9297 and the other variables from the quick start."
      }
     },
     {
@@ -232,7 +232,7 @@
      "name": "How do I verify the image?",
      "acceptedAnswer": {
       "@type": "Answer",
-      "text": "Each image has a keyless cosign signature, an SBOM and SLSA provenance. Run cosign verify (version 3 or later) with --certificate-identity-regexp '^https://github.com/xSAVIKx/aws-emulator-docker/' and --certificate-oidc-issuer https://token.actions.githubusercontent.com, or run gh attestation verify with --owner xSAVIKx."
+      "text": "Each image has a keyless cosign signature, an SBOM and SLSA provenance. Run cosign verify (version 3 or later) with --certificate-identity 'https://github.com/xSAVIKx/aws-emulator-docker/.github/workflows/release.yml@refs/heads/main' and --certificate-oidc-issuer https://token.actions.githubusercontent.com, or run gh attestation verify with --owner xSAVIKx."
      }
     },
     {
@@ -378,18 +378,19 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding:24px 0 40px;colo
 <section class="hero">
   <span class="badge">Upstream version <b id="ver">__VERSION__</b> · linux/amd64 · linux/arm64 · Amazon Linux, Debian and distroless</span>
   <h1>The <span>AWS Emulator</span>, ready to run in Docker.</h1>
-  <p class="lead">AWS does not publish a prebuilt image of its local AWS API emulator. This project builds one, tests it on both architectures, signs it, and publishes it to three registries. A new upstream release is live within one hour.</p>
+  <p class="lead">AWS does not publish a prebuilt image of its local AWS API emulator. This project builds one, tests it on both architectures, signs it, and publishes it to three registries. A workflow checks for a new upstream release every hour and publishes a new image in about one to two hours.</p>
+  <p class="muted" style="margin:0 0 8px">A quick health check only. For SDK use, follow the <a href="#quick-start">quick start</a>.</p>
   <pre><code>docker run --rm -p 127.0.0.1:9297:9297 ghcr.io/xsavikx/aws-emulator</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
   <div class="btns">
     <a class="btn primary" href="#quick-start">Quick start</a>
     <a class="btn" href="https://github.com/xSAVIKx/aws-emulator-docker">Source on GitHub</a>
   </div>
-  <p class="muted" style="margin-top:14px">Write-up with <code>docker run</code>, Compose, GitHub Actions and the gotchas: <a href="https://serhiichuk.dev/blog/aws-emulator-container-image/">Running AWS Emulator in Docker, on any arch, in CI</a>.</p>
+  <p class="muted" style="margin-top:14px">A blog post about <code>docker run</code>, Compose, GitHub Actions and known problems: <a href="https://serhiichuk.dev/blog/aws-emulator-container-image/">Running AWS Emulator in Docker, on any arch, in CI</a>.</p>
 </section>
 
 <div class="grid">
   <div class="card"><b>Multi-arch</b><p>Native amd64 and arm64 builds. Runs on Linux, on macOS (Intel and Apple silicon) and on Windows with Docker Desktop.</p></div>
-  <div class="card"><b>Verified upstream</b><p>A pinned upstream version, with an SHA-256 check and an RPM signature check against the AWS signing key.</p></div>
+  <div class="card"><b>Verified upstream</b><p>A pinned upstream version, with an SHA-256 check and an RPM or DEB package signature check against the AWS signing key.</p></div>
   <div class="card"><b>Signed</b><p>Keyless cosign signature, SBOM, SLSA provenance and a GitHub artifact attestation.</p></div>
   <div class="card"><b>Tested</b><p>Each build runs STS and S3 calls and a health check on both architectures before it is published.</p></div>
 </div>
@@ -428,19 +429,24 @@ docker run --rm --memory=2g --memory-swap=2g -p "127.0.0.1:${port}:${port}" `
   ghcr.io/xsavikx/aws-emulator -p $port</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
 </div>
 <div class="panel" data-group="run" data-name="compose" hidden>
-<pre><code>services:
+<pre><code># Usage:
+#   mkdir -p ~/.aws/emulator
+#   UID_GID="$(id -u):$(id -g)" docker compose up
+services:
   aws-emulator:
     image: ghcr.io/xsavikx/aws-emulator:latest
     command: ["-p", "9297"]
     user: "${UID_GID:-1000:1000}"
     environment:
       HOME: ${HOME}
+      EMULATOR_TELEMETRY: ${EMULATOR_TELEMETRY:-on}
     ports:
       - "127.0.0.1:9297:9297"
     volumes:
       - ${HOME}/.aws/emulator:${HOME}/.aws/emulator
     mem_limit: 2g
-    memswap_limit: 2g</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
+    memswap_limit: 2g
+    restart: "no"</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
 <p class="muted">Start it with <code>UID_GID="$(id -u):$(id -g)" docker compose up</code>.</p>
 </div>
 
@@ -487,7 +493,7 @@ aws sts get-caller-identity</code><button class="copy" type="button" aria-label=
 </ul>
 
 <h2 id="examples">Examples</h2>
-<p>Integration tests in six languages, with the most common test framework of each language and the official AWS SDK. Every example tests the same scenarios: STS identity, S3 objects, a DynamoDB table, an SQS queue, SNS to SQS fan-out, and a Secrets Manager secret. CI runs all of them on amd64 and arm64 after each image release.</p>
+<p>Integration tests in six languages, with the most common test framework of each language and the official AWS SDK. Every example tests the same scenarios: STS identity, S3 objects, a DynamoDB table, an SQS queue, SNS to SQS fan-out, and a Secrets Manager secret. CI runs all of them on amd64 and arm64 every day and after each image release.</p>
 <div class="tabs" role="tablist" data-group="ex">
   <button role="tab" aria-selected="true" data-panel="python">Python</button>
   <button role="tab" aria-selected="false" data-panel="typescript">TypeScript</button>
@@ -563,7 +569,7 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
 
 <h2 id="github-action">GitHub Action</h2>
 <p><a class="mbadge" href="https://github.com/marketplace/actions/run-aws-emulator"><svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.34.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg> Run AWS Emulator on the GitHub Marketplace</a></p>
-<p>The <a href="https://github.com/marketplace/actions/run-aws-emulator">Run AWS Emulator</a> action runs this image in your workflow. It waits until the emulator is healthy and sets the environment, so the AWS CLI and the SDKs in the next steps use the emulator with no code change. It works on <code>ubuntu-24.04</code>, <code>ubuntu-24.04-arm</code> and any other runner with Docker.</p>
+<p>The <a href="https://github.com/marketplace/actions/run-aws-emulator">Run AWS Emulator</a> action runs this image in your workflow. It waits until the emulator is healthy and sets the environment, so the AWS CLI and the SDKs in the next steps use the emulator with no code change. It works on Linux runners with Docker or Podman, x64 and arm64.</p>
 <pre><code>jobs:
   test:
     runs-on: ubuntu-latest
@@ -576,9 +582,9 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
 <div class="tablewrap"><table>
   <thead><tr><th scope="col">Runner</th><th scope="col">Result</th></tr></thead>
   <tbody>
-    <tr><td>Ubuntu 22.04, 24.04, 26.04 and <code>ubuntu-latest</code>, x64 and arm64</td><td>Supported. Tested in CI on every change, with all six language examples.</td></tr>
-    <tr><td>Self-hosted Linux with Docker or Podman</td><td>Supported. Rootless Docker and rootless Podman work. Podman is tested on Ubuntu 24.04 and 26.04.</td></tr>
-    <tr><td>macOS, Windows and <code>ubuntu-slim</code> (GitHub-hosted)</td><td>Not supported: these runners have no Docker for Linux containers. The action stops at once with a clear message.</td></tr>
+    <tr><td>Ubuntu 22.04, 24.04 and 26.04 (GitHub-hosted): <code>ubuntu-latest</code> (x64), <code>ubuntu-22.04</code>, <code>ubuntu-24.04</code> and <code>ubuntu-26.04</code> (x64), <code>ubuntu-22.04-arm</code>, <code>ubuntu-24.04-arm</code> and <code>ubuntu-26.04-arm</code> (arm64)</td><td>Supported. The CI of the action tests the action on these runners on each change. The six language examples run every day and after each image release.</td></tr>
+    <tr><td>Self-hosted Linux with Docker or Podman</td><td>Supported. The CI of the action tests Podman on Ubuntu 24.04 and 26.04. Rootless Docker is expected to work, tested manually.</td></tr>
+    <tr><td>macOS, Windows and <code>ubuntu-slim</code> (GitHub-hosted)</td><td>Not supported: these runners have no Docker for Linux containers. The action stops immediately with a clear message.</td></tr>
   </tbody>
 </table></div>
 <p>For reproducible runs, pin the image to a build tag or a digest:</p>
@@ -590,7 +596,7 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
 <div class="tablewrap"><table>
   <thead><tr><th scope="col">Input</th><th scope="col">Description</th></tr></thead>
   <tbody>
-    <tr><td><code>image</code></td><td>The image. Use a <code>-debian</code> tag for the Debian variant. Default: <code class="long">ghcr.io/xsavikx/aws-emulator:latest</code>.</td></tr>
+    <tr><td><code>image</code></td><td>The image. Use a <code>-debian</code> or <code>-distroless</code> tag for another variant. Default: <code class="long">ghcr.io/xsavikx/aws-emulator:latest</code>.</td></tr>
     <tr><td><code>port</code></td><td>The port on <code>127.0.0.1</code>. The container uses the same port. Default: <code>9297</code>.</td></tr>
     <tr><td><code>region</code></td><td>The value of <code>AWS_REGION</code> and <code>AWS_DEFAULT_REGION</code>. Default: <code>us-east-1</code>.</td></tr>
     <tr><td><code>telemetry</code></td><td>Upstream emulator telemetry, <code>on</code> or <code>off</code>. Default: <code>off</code>.</td></tr>
@@ -645,32 +651,33 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
 <div class="tablewrap"><table>
   <thead><tr><th scope="col">Variant and base image</th><th scope="col">Tags</th></tr></thead>
   <tbody>
-    <tr><td>Amazon Linux (default)<br><code>amazonlinux:2023-minimal</code></td><td><code>latest</code>, <code>__VERSION__</code>, ...</td></tr>
+    <tr><td>Amazon Linux (default)<br><code class="long">public.ecr.aws/amazonlinux/amazonlinux:2023-minimal</code></td><td><code>latest</code>, <code>__VERSION__</code>, ...</td></tr>
     <tr><td>Debian<br><code>debian:trixie-slim</code></td><td><code>debian</code>, <code>latest-debian</code>, <code>__VERSION__-debian</code>, ...</td></tr>
     <tr><td>Distroless<br><code>gcr.io/distroless/cc-debian13</code></td><td><code>distroless</code>, <code>latest-distroless</code>, <code>__VERSION__-distroless</code>, ...</td></tr>
   </tbody>
 </table></div>
-<p class="muted">Each tag of the default variant has a Debian twin with the <code>-debian</code> suffix and a distroless twin with the <code>-distroless</code> suffix. The distroless variant has no shell, no package manager and no <code>curl</code>, so scanners report very few findings. Both install the same upstream emulator, from the <code>.rpm</code> or the <code>.deb</code> package, and both behave the same way.</p>
+<p class="muted">Each tag of the default variant has a matching tag with the <code>-debian</code> suffix and a matching tag with the <code>-distroless</code> suffix. The three variants install the same upstream emulator. The Amazon Linux variant uses the <code>.rpm</code> package. The Debian and distroless variants use the <code>.deb</code> package. The three variants use the same user, port and health check route.</p>
+<p class="muted">The distroless variant has no shell, no package manager and no <code>curl</code>, so scanners report very few findings. Its health check is a small Go program. The other two variants use a shell script with <code>curl</code>. Its entry point is <code>/opt/aws-emulator/bin/aws-emulator</code>. The other two variants use <code>aws-emulator</code> from the <code>PATH</code>.</p>
 
 <h2 id="verify">Verify the image</h2>
 <p>Each image has a keyless cosign signature from GitHub Actions. Use cosign v3 or later. Cosign v2 reports "no signatures found".</p>
 <pre><code>cosign verify ghcr.io/xsavikx/aws-emulator:latest \
-  --certificate-identity-regexp '^https://github.com/xSAVIKx/aws-emulator-docker/' \
+  --certificate-identity 'https://github.com/xSAVIKx/aws-emulator-docker/.github/workflows/release.yml@refs/heads/main' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
 <pre><code>gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
-<p class="muted">The build checks the upstream RPM against the AWS package signing key, <code>SSM Publishing &lt;ssm-publishing@amazon.com&gt;</code>, fingerprint <code>98BC F336 A3BE 53B7 34E9 67C5 2E5B F49B D940 F624</code>. The base image is pinned by digest.</p>
+<p class="muted">The build checks the RPM or DEB package signature of the upstream package with the AWS package signing key, <code>SSM Publishing &lt;ssm-publishing@amazon.com&gt;</code>, fingerprint <code>98BC F336 A3BE 53B7 34E9 67C5 2E5B F49B D940 F624</code>. Each base image is pinned by digest.</p>
 
 <h2 id="faq">Frequently asked questions</h2>
 <div class="releases">
 <details class="release faq"><summary><b>What is the AWS Emulator?</b></summary><div class="release-body"><p>The AWS Emulator is a local emulator of the AWS APIs from Amazon Web Services. It serves STS, S3, DynamoDB, SQS, SNS, Secrets Manager and many other services over HTTPS on 127.0.0.1, so tests and coding agents can run without an AWS account.</p></div></details>
 <details class="release faq"><summary><b>Does AWS publish a Docker image of the AWS Emulator?</b></summary><div class="release-body"><p>No. The AWS guide tells you to build an image yourself from a short Dockerfile. This project builds that image for linux/amd64 and linux/arm64, tests it, signs it, and publishes it to GHCR, Docker Hub and Quay.io.</p></div></details>
-<details class="release faq"><summary><b>How do I run the AWS Emulator in Docker?</b></summary><div class="release-body"><p>Create ~/.aws/emulator, then run: docker run --rm -p 127.0.0.1:9297:9297 --user &quot;$(id -u):$(id -g)&quot; -e HOME=&quot;$HOME&quot; -v &quot;$HOME/.aws/emulator:$HOME/.aws/emulator&quot; ghcr.io/xsavikx/aws-emulator -p 9297. Then set AWS_ENDPOINT_URL=https://127.0.0.1:9297 and the other variables from the quick start.</p></div></details>
+<details class="release faq"><summary><b>How do I run the AWS Emulator in Docker?</b></summary><div class="release-body"><p>Create ~/.aws/emulator, then run: docker run --rm --memory=2g --memory-swap=2g -p 127.0.0.1:9297:9297 --user &quot;$(id -u):$(id -g)&quot; -e HOME=&quot;$HOME&quot; -v &quot;$HOME/.aws/emulator:$HOME/.aws/emulator&quot; ghcr.io/xsavikx/aws-emulator -p 9297. Then set AWS_ENDPOINT_URL=https://127.0.0.1:9297 and the other variables from the quick start.</p></div></details>
 <details class="release faq"><summary><b>Does the image work on macOS, Windows and Apple silicon?</b></summary><div class="release-body"><p>Yes. The image is a Linux image for amd64 and arm64. Docker Desktop runs it on macOS with Intel or Apple silicon and on Windows with the WSL 2 backend. Windows containers are not available, because the emulator runs only on Linux.</p></div></details>
 <details class="release faq"><summary><b>How do I use the AWS Emulator in GitHub Actions?</b></summary><div class="release-body"><p>Add the step uses: xSAVIKx/run-aws-emulator@v1. The Run AWS Emulator action starts the image, waits until it is healthy, and sets AWS_ENDPOINT_URL, the credentials, and the CA settings, so the AWS CLI and the SDKs in the next steps use the emulator.</p></div></details>
 <details class="release faq"><summary><b>Why do my SQS calls with the AWS SDK for JavaScript v3 go to real AWS?</b></summary><div class="release-body"><p>The emulator returns queue URLs with the real AWS host, for example https://sqs.us-east-1.amazonaws.com/000000000000/my-queue. The AWS SDK for JavaScript v3 sends SQS requests to the host in the queue URL. Set useQueueUrlAsEndpoint: false on the SQSClient. The SDKs for Python, Go, Java, .NET and Rust need no setting.</p></div></details>
 <details class="release faq"><summary><b>Why does the emulator fail with Permission denied on rootless Docker?</b></summary><div class="release-body"><p>With rootless Docker, container user IDs map to other host user IDs, so the emulator cannot write to the mounted directory. Use --user 0:0, because container root maps to your own host user. With Podman, use --userns=keep-id.</p></div></details>
 <details class="release faq"><summary><b>Should I use localhost or 127.0.0.1 in AWS_ENDPOINT_URL?</b></summary><div class="release-body"><p>Use 127.0.0.1. With a host name such as localhost, some SDKs use virtual-hosted S3 addresses such as bucket.localhost, which do not resolve. Also use path-style S3 addresses in your S3 client.</p></div></details>
-<details class="release faq"><summary><b>How do I verify the image?</b></summary><div class="release-body"><p>Each image has a keyless cosign signature, an SBOM and SLSA provenance. Run cosign verify (version 3 or later) with --certificate-identity-regexp &#x27;^https://github.com/xSAVIKx/aws-emulator-docker/&#x27; and --certificate-oidc-issuer https://token.actions.githubusercontent.com, or run gh attestation verify with --owner xSAVIKx.</p></div></details>
+<details class="release faq"><summary><b>How do I verify the image?</b></summary><div class="release-body"><p>Each image has a keyless cosign signature, an SBOM and SLSA provenance. Run cosign verify (version 3 or later) with --certificate-identity &#x27;https://github.com/xSAVIKx/aws-emulator-docker/.github/workflows/release.yml@refs/heads/main&#x27; and --certificate-oidc-issuer https://token.actions.githubusercontent.com, or run gh attestation verify with --owner xSAVIKx.</p></div></details>
 <details class="release faq"><summary><b>Is this an official AWS project?</b></summary><div class="release-body"><p>No. This is an unofficial community project by Yurii Serhiichuk. It is not affiliated with or endorsed by Amazon Web Services. The AWS Emulator itself is open source under CC0 1.0, with vendored code under the Apache License 2.0.</p></div></details>
 </div>
 
@@ -681,7 +688,7 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
 </div>
 
 <h2 id="licenses">Licenses</h2>
-<p>The files in this repository are under the Apache License 2.0. The AWS Emulator is under CC0 1.0 Universal, with its <code>vendor/</code> code under the Apache License 2.0. This is an unofficial community project. It is not affiliated with or endorsed by Amazon Web Services.</p>
+<p>The files in this repository are under the Apache License 2.0. The AWS Emulator is under CC0 1.0 Universal, with its <code>vendor/</code> code under the Apache License 2.0. For the base images <code>public.ecr.aws/amazonlinux/amazonlinux:2023-minimal</code>, <code>debian:trixie-slim</code> and <code>gcr.io/distroless/cc-debian13</code>, see the licenses of their packages. This is an unofficial community project. It is not affiliated with or endorsed by Amazon Web Services.</p>
 </main>
 
 <footer><div class="wrap">

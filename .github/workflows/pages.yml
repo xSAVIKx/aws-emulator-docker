@@ -6,10 +6,8 @@ on:
     paths:
       - "site/**"
       - ".github/workflows/pages.yml"
-  workflow_run:
-    workflows: ["Build and publish"]
-    types: [completed]
-    branches: [main]
+  # The release workflow calls this workflow after each publish.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -21,19 +19,21 @@ concurrency:
 
 jobs:
   build:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Insert the current upstream version
+      - name: Insert the published version
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          v=$(curl -fsSL --retry 5 https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/versions.json \
-            | jq -r '.versions[].version' | sort -V | tail -1)
+          # Show the version of the newest published release, not the newest upstream version.
+          v=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName -q .tagName | sed 's/^v//')
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected release tag '$v'"; exit 1; }
           short=$(cut -d. -f1-3 <<<"$v")
           today=$(date -u +%Y-%m-%d)
           sed -i "s/__VERSION_SHORT__/$short/g; s/__VERSION__/$v/g; s/__DATE__/$today/g" \

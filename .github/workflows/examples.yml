@@ -12,10 +12,17 @@ on:
       - "examples/**"
       - ".github/actions/aws-emulator/**"
       - ".github/workflows/examples.yml"
-  workflow_run:
-    workflows: ["Build and publish"]
-    types: [completed]
-    branches: [main]
+  # The release workflow calls this workflow after each publish.
+  workflow_call:
+    inputs:
+      image:
+        description: Image to test
+        type: string
+        required: true
+      full:
+        description: Run on all Ubuntu versions
+        type: boolean
+        default: true
   schedule:
     - cron: "41 5 * * *"
   workflow_dispatch:
@@ -24,6 +31,10 @@ on:
         description: Image to test
         default: ghcr.io/xsavikx/aws-emulator:latest
         type: string
+      full:
+        description: Run on all Ubuntu versions
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -35,12 +46,13 @@ concurrency:
 jobs:
   test:
     name: ${{ matrix.lang }} on ${{ matrix.os }}${{ matrix.arch }}
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     strategy:
       fail-fast: false
       matrix:
         lang: [python, typescript, java, go, dotnet, rust]
-        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04]
+        # Push and pull request runs use one Ubuntu version. Scheduled, manual and
+        # post-publish runs use all supported versions.
+        os: ${{ fromJSON((inputs.full || github.event_name == 'schedule') && '["ubuntu-22.04","ubuntu-24.04","ubuntu-26.04"]' || '["ubuntu-24.04"]') }}
         arch: ["", "-arm"]
     runs-on: ${{ matrix.os }}${{ matrix.arch }}
     timeout-minutes: 30
@@ -55,6 +67,8 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: examples/typescript/.nvmrc
+          cache: npm
+          cache-dependency-path: examples/typescript/package-lock.json
       - if: matrix.lang == 'java'
         uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
@@ -67,6 +81,10 @@ jobs:
         with:
           go-version-file: examples/go/go.mod
           cache-dependency-path: examples/go/go.sum
+      - if: matrix.lang == 'rust'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: examples/rust
       - if: matrix.lang == 'dotnet'
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:

@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.10
+# syntax=docker/dockerfile:1.10@sha256:865e5dd094beca432e8c0a1d5e1c465db5f998dca4e439981029b3b81fb39ed5
 #
 # Container image for the AWS Emulator (https://github.com/aws/aws-emulator).
 # Based on the official guide:
@@ -45,7 +45,10 @@ RUN set -eu; \
     if [ -n "${want}" ]; then \
       echo "${want}  /aws-emulator.rpm" | sha256sum -c -; \
     fi; \
+    # Trust only the AWS key: remove the keys that the base image ships.
+    rpm -e --allmatches gpg-pubkey >/dev/null 2>&1 || true; \
     rpmkeys --import /keys/aws-emulator-signing-key.asc; \
+    test "$(rpm -q gpg-pubkey | wc -l)" -eq 1; \
     rpm -q --qf '%{VERSION}-%{RELEASE}\n' gpg-pubkey; \
     fp_short="$(echo "${RPM_SIGNER_FINGERPRINT}" | tail -c 9 | tr 'A-F' 'a-f')"; \
     rpm -q gpg-pubkey --qf '%{VERSION}\n' | grep -qx "${fp_short}"; \

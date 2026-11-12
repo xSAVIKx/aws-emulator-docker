@@ -3,22 +3,21 @@ name: Build and publish
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "site/**"
-      - "**.md"
-      - ".github/workflows/pages.yml"
-      - ".github/workflows/lint.yml"
-      - ".github/workflows/example-integration.yml"
+    # Publish only when a file that goes into the image or its tests changes.
+    paths: &image_paths
+      - "Dockerfile*"
+      - ".dockerignore"
+      - "healthcheck.sh"
+      - "healthcheck/**"
+      - "keys/**"
+      - "tests/**"
+      - ".github/workflows/release.yml"
   pull_request:
+    paths: *image_paths
   schedule:
     # Check for a new AWS Emulator release every hour.
     - cron: "17 * * * *"
   workflow_dispatch:
-    inputs:
-      force:
-        description: Publish even if the version already exists
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -56,6 +55,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Read base images from the Dockerfiles
         id: base
@@ -74,9 +74,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # One small request. The RPMs are downloaded only when a build is due.
-          upstream=$(curl -fsSL --retry 5 "$DOWNLOAD_BASE/versions.json" | jq -r '.versions[].version' | sort -V | tail -1)
-          [ -n "$upstream" ] || { echo "::error::No version in versions.json"; exit 1; }
+          # Small requests only. The packages are downloaded only when a build is due.
+          # Take the newest valid version whose four packages are downloadable.
+          upstream=""
+          for cand in $(curl -fsSL --retry 5 "$DOWNLOAD_BASE/versions.json" | jq -r '.versions[].version' | sort -Vr | head -5); do
+            [[ "$cand" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::warning::Ignoring invalid version '$cand'"; continue; }
+            v="${cand%.*}-${cand##*.}"; ok=true
+            for f in "aws-emulator-$v-x86_64.rpm" "aws-emulator-$v-aarch64.rpm" "aws-emulator_${v}_amd64.deb" "aws-emulator_${v}_arm64.deb"; do
+              code=$(curl -s -o /dev/null -I -w '%{http_code}' --retry 3 "$DOWNLOAD_BASE/$f")
+              [ "$code" = 200 ] || { echo "::notice::$cand: $f returned $code"; ok=false; break; }
+            done
+            if [ "$ok" = true ]; then upstream="$cand"; break; fi
+          done
+          [ -n "$upstream" ] || { echo "::error::No downloadable version in versions.json"; exit 1; }
           # Package version is like 1.0.322.1. The emulator reports 1.0.322.
           echo "upstream_version=$upstream" | tee -a "$GITHUB_OUTPUT"
           echo "version=$(cut -d. -f1-3 <<<"$upstream")" | tee -a "$GITHUB_OUTPUT"
@@ -90,23 +100,27 @@ jobs:
         env:
           UPSTREAM: ${{ steps.v.outputs.upstream_version }}
           EVENT: ${{ github.event_name }}
-          FORCE: ${{ inputs.force }}
         run: |
           set -euo pipefail
           publish=false
           case "$EVENT" in
             push|workflow_dispatch) publish=true ;;
             schedule)
-              if docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM" >/dev/null 2>&1 \
-                && docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM-debian" >/dev/null 2>&1 \
-                && docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM-distroless" >/dev/null 2>&1; then
-                echo "All variants of $GHCR_IMAGE:$UPSTREAM exist. Nothing to do."
-              else
-                publish=true
+              for tag in "$UPSTREAM" "$UPSTREAM-debian" "$UPSTREAM-distroless"; do
+                docker buildx imagetools inspect "$GHCR_IMAGE:$tag" >/dev/null 2>&1 || { echo "$tag is missing."; publish=true; }
+              done
+              # A queued push can be replaced by a schedule run. Publish when image
+              # files changed since the commit that built the current :latest.
+              rev=$(docker buildx imagetools inspect --raw "$GHCR_IMAGE:latest" 2>/dev/null \
+                | jq -r '.annotations["org.opencontainers.image.revision"] // empty' || true)
+              if [ -n "$rev" ] && git cat-file -e "$rev^{commit}" 2>/dev/null; then
+                if ! git diff --quiet "$rev" HEAD -- 'Dockerfile*' .dockerignore healthcheck.sh healthcheck keys tests .github/workflows/release.yml; then
+                  echo "Image files changed since $rev."; publish=true
+                fi
               fi ;;
           esac
-          if [ "$EVENT" = "push" ] && [ "${GITHUB_REF}" != "refs/heads/main" ] && [[ "${GITHUB_REF}" != refs/tags/v* ]]; then publish=false; fi
-          if [ "$FORCE" = "true" ]; then publish=true; fi
+          # Only the main branch publishes. Pull requests and other branches only build and test.
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then publish=false; fi
           echo "publish=$publish" | tee -a "$GITHUB_OUTPUT"
 
       - name: Checksums of the pinned packages
@@ -207,7 +221,7 @@ jobs:
             DEB_SHA256_AMD64=${{ needs.resolve.outputs.deb_sha_amd64 }}
             DEB_SHA256_ARM64=${{ needs.resolve.outputs.deb_sha_arm64 }}
           cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
-          cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: ${{ github.event_name != 'pull_request' && format('type=gha,mode=max,scope={0}', env.PLATFORM_PAIR) || '' }}
 
       - name: Smoke test
         shell: bash
@@ -258,7 +272,7 @@ jobs:
           name: digests-${{ env.PLATFORM_PAIR }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   publish:
     name: Publish ${{ matrix.variant }} manifest
@@ -346,7 +360,7 @@ jobs:
             latest=false
             suffix=${{ matrix.suffix }}
           tags: |
-            type=raw,value=${{ needs.resolve.outputs.build_tag }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
+            type=raw,value=${{ needs.resolve.outputs.build_tag }}${{ github.run_attempt > 1 && format('.{0}', github.run_attempt) || '' }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=raw,value=${{ needs.resolve.outputs.upstream_version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=raw,value=${{ needs.resolve.outputs.version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.resolve.outputs.version }},enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
@@ -365,6 +379,8 @@ jobs:
           TAGS_JSON: ${{ steps.meta.outputs.json }}
         run: |
           set -euo pipefail
+          n=$(find . -maxdepth 1 -type f | wc -l)
+          [ "$n" -eq 2 ] || { echo "::error::Expected 2 platform digests, found $n"; exit 1; }
           args=()
           while IFS= read -r t; do args+=(-t "$t"); done < <(jq -r '.tags[]' <<<"$TAGS_JSON")
           while IFS= read -r a; do args+=(--annotation "$a"); done < <(jq -r '.annotations[]' <<<"$TAGS_JSON")
@@ -423,7 +439,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       UPSTREAM: ${{ needs.resolve.outputs.upstream_version }}
       VERSION: ${{ needs.resolve.outputs.version }}
-      BUILD_TAG: ${{ needs.resolve.outputs.build_tag }}
+      BUILD_TAG: ${{ needs.resolve.outputs.build_tag }}${{ github.run_attempt > 1 && format('.{0}', github.run_attempt) || '' }}
       CREATED: ${{ needs.resolve.outputs.created }}
       RPM_AMD64: ${{ needs.resolve.outputs.rpm_sha_amd64 }}
       RPM_ARM64: ${{ needs.resolve.outputs.rpm_sha_arm64 }}
@@ -482,7 +498,7 @@ jobs:
             echo
             echo '```sh'
             echo "cosign verify ghcr.io/xsavikx/aws-emulator@$d_al \\"
-            echo "  --certificate-identity-regexp '^https://github.com/xSAVIKx/aws-emulator-docker/' \\"
+            echo "  --certificate-identity 'https://github.com/xSAVIKx/aws-emulator-docker/.github/workflows/release.yml@refs/heads/main' \\"
             echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com"
             echo '```'
           } > notes.md
@@ -500,23 +516,21 @@ jobs:
               --title "AWS Emulator $UPSTREAM" --notes-file notes.md --latest
           fi
 
-  dockerhub-description:
-    name: Update Docker Hub description
-    needs: publish
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: env.DOCKERHUB_USERNAME != ''
-        with:
-          persist-credentials: false
-      - uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
-        if: env.DOCKERHUB_USERNAME != ''
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}/aws-emulator
-          short-description: Multi-arch (amd64/arm64) image of the AWS Emulator, a local emulator of the AWS APIs.
-          readme-filepath: ./README.md
+  examples:
+    name: Examples with the new image
+    needs: [resolve, publish]
+    if: needs.resolve.outputs.publish == 'true'
+    uses: ./.github/workflows/examples.yml
+    with:
+      image: ghcr.io/xsavikx/aws-emulator:${{ needs.resolve.outputs.upstream_version }}
+      full: true
+
+  pages:
+    name: Update the website
+    needs: [resolve, release]
+    if: needs.resolve.outputs.publish == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
