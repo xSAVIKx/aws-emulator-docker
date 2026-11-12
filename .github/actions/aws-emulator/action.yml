@@ -41,7 +41,7 @@ runs:
     # The action moved to its own repository: https://github.com/xSAVIKx/run-aws-emulator
     # This path stays as a thin wrapper for workflows that already use it.
     - id: start
-      uses: xSAVIKx/run-aws-emulator@v1
+      uses: xSAVIKx/run-aws-emulator@7a51c40fa9285e94bf328e4e44ebbde07bddaaac # v1.1.0
       with:
         image: ${{ inputs.image }}
         port: ${{ inputs.port }}
