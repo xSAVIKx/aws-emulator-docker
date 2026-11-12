@@ -1,6 +1,8 @@
 # Usage:
 #   mkdir -p ~/.aws/emulator
 #   UID_GID="$(id -u):$(id -g)" docker compose up
+# With rootless Docker, container root maps to your user:
+#   UID_GID=0:0 docker compose up
 services:
   aws-emulator:
     image: ghcr.io/xsavikx/aws-emulator:latest

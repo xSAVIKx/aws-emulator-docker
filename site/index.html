@@ -432,6 +432,8 @@ docker run --rm --memory=2g --memory-swap=2g -p "127.0.0.1:${port}:${port}" `
 <pre><code># Usage:
 #   mkdir -p ~/.aws/emulator
 #   UID_GID="$(id -u):$(id -g)" docker compose up
+# With rootless Docker, container root maps to your user:
+#   UID_GID=0:0 docker compose up
 services:
   aws-emulator:
     image: ghcr.io/xsavikx/aws-emulator:latest
@@ -447,7 +449,7 @@ services:
     mem_limit: 2g
     memswap_limit: 2g
     restart: "no"</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
-<p class="muted">Start it with <code>UID_GID="$(id -u):$(id -g)" docker compose up</code>.</p>
+<p class="muted">Start it with <code>UID_GID="$(id -u):$(id -g)" docker compose up</code>. With rootless Docker, use <code>UID_GID=0:0</code>.</p>
 </div>
 
 <p><b>Step 3.</b> Point the AWS CLI or an SDK at the emulator.</p>
@@ -664,7 +666,7 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
 <pre><code>cosign verify ghcr.io/xsavikx/aws-emulator:latest \
   --certificate-identity 'https://github.com/xSAVIKx/aws-emulator-docker/.github/workflows/release.yml@refs/heads/main' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
-<pre><code>gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
+<pre><code>gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx --format json</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
 <p class="muted">The build checks the RPM or DEB package signature of the upstream package with the AWS package signing key, <code>SSM Publishing &lt;ssm-publishing@amazon.com&gt;</code>, fingerprint <code>98BC F336 A3BE 53B7 34E9 67C5 2E5B F49B D940 F624</code>. Each base image is pinned by digest.</p>
 
 <h2 id="faq">Frequently asked questions</h2>

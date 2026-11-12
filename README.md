@@ -80,7 +80,9 @@ reproducible builds, pin a build tag or a digest. Each build is listed in the
    mkdir -p ~/.aws/emulator
    ```
 
-2. Start the emulator (macOS and Linux):
+2. Start the emulator (macOS and Linux). With rootless Docker, use `--user 0:0` instead of
+   `--user "$(id -u):$(id -g)"`. Otherwise the start fails with
+   `Permission denied (os error 13)`.
 
    ```sh
    PORT=9297
@@ -119,7 +121,7 @@ reproducible builds, pin a build tag or a digest. Each build is listed in the
    the `truststore.p12` file. See the
    [SDK guide](https://docs.aws.amazon.com/emulator/latest/userguide/point-sdk-to-emulator.html).
 
-4. Stop it with Ctrl+C or `docker stop`. The emulator removes its files from
+4. Stop it with Ctrl+C or `docker stop`. The emulator removes its runtime files from
    `~/.aws/emulator/<port>/`. All state is in memory and goes away.
 
 ### Docker Compose
@@ -129,6 +131,8 @@ See [`compose.yaml`](compose.yaml).
 ```sh
 mkdir -p ~/.aws/emulator
 UID_GID="$(id -u):$(id -g)" docker compose up
+# With rootless Docker:
+UID_GID=0:0 docker compose up
 ```
 
 ## Examples and GitHub Action
@@ -206,10 +210,18 @@ cosign verify ghcr.io/xsavikx/aws-emulator:latest \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
+Without a local cosign installation, run cosign as a container:
+
+```sh
+docker run --rm ghcr.io/sigstore/cosign/cosign:v3.1.4 verify ghcr.io/xsavikx/aws-emulator:latest \
+  --certificate-identity 'https://github.com/xSAVIKx/aws-emulator-docker/.github/workflows/release.yml@refs/heads/main' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
 Verify the GitHub attestation:
 
 ```sh
-gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx
+gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx --format json
 ```
 
 ## Build it yourself
