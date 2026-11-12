@@ -7,7 +7,7 @@ AWS does not publish a prebuilt image. This project builds one from the pinned, 
 ## Images
 
 - `ghcr.io/xsavikx/aws-emulator`, `docker.io/xsavikx/aws-emulator`, `quay.io/xsavikx/aws-emulator`
-- Tags: `latest`, `lts`, `__VERSION__` (package version), `1.0`, `1`, immutable build tags `__VERSION__-<yyyymmdd>.<run>`; Debian variant with the `-debian` suffix and `debian`.
+- Tags: `latest`, `lts`, `__VERSION__` (package version), `1.0`, `1`, immutable build tags `__VERSION__-<yyyymmdd>.<run>`; Debian variant with the `-debian` suffix and `debian`; distroless variant (no shell) with the `-distroless` suffix and `distroless`.
 
 ## Quick start
 

@@ -50,6 +50,8 @@ jobs:
       base_digest_amazonlinux: ${{ steps.base.outputs.digest_amazonlinux }}
       base_name_debian: ${{ steps.base.outputs.name_debian }}
       base_digest_debian: ${{ steps.base.outputs.digest_debian }}
+      base_name_distroless: ${{ steps.base.outputs.name_distroless }}
+      base_digest_distroless: ${{ steps.base.outputs.digest_distroless }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -60,7 +62,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for pair in amazonlinux:Dockerfile debian:Dockerfile.debian; do
+          for pair in amazonlinux:Dockerfile debian:Dockerfile.debian distroless:Dockerfile.distroless; do
             v=${pair%%:*}; f=${pair#*:}
             ref=$(sed -n 's/^ARG BASE_IMAGE=//p' "$f")
             echo "name_$v=${ref%@*}" | tee -a "$GITHUB_OUTPUT"
@@ -96,8 +98,9 @@ jobs:
             push|workflow_dispatch) publish=true ;;
             schedule)
               if docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM" >/dev/null 2>&1 \
-                && docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM-debian" >/dev/null 2>&1; then
-                echo "$GHCR_IMAGE:$UPSTREAM and :$UPSTREAM-debian exist. Nothing to do."
+                && docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM-debian" >/dev/null 2>&1 \
+                && docker buildx imagetools inspect "$GHCR_IMAGE:$UPSTREAM-distroless" >/dev/null 2>&1; then
+                echo "All variants of $GHCR_IMAGE:$UPSTREAM exist. Nothing to do."
               else
                 publish=true
               fi ;;
@@ -132,7 +135,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [amazonlinux, debian]
+        variant: [amazonlinux, debian, distroless]
         platform: [linux/amd64, linux/arm64]
         include:
           - platform: linux/amd64
@@ -145,6 +148,9 @@ jobs:
           - variant: debian
             dockerfile: Dockerfile.debian
             title: AWS Emulator (Debian)
+          - variant: distroless
+            dockerfile: Dockerfile.distroless
+            title: AWS Emulator (distroless)
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -268,6 +274,9 @@ jobs:
           - variant: debian
             suffix: "-debian"
             title: AWS Emulator (Debian)
+          - variant: distroless
+            suffix: "-distroless"
+            title: AWS Emulator (distroless)
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -346,6 +355,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
             type=sha,format=short,prefix=sha-
             type=raw,value=debian,suffix=,enable=${{ matrix.variant == 'debian' && (github.ref == 'refs/heads/main' || github.event_name != 'push') }}
+            type=raw,value=distroless,suffix=,enable=${{ matrix.variant == 'distroless' && (github.ref == 'refs/heads/main' || github.event_name != 'push') }}
           labels: *labels
 
       - name: Create and push manifest lists
@@ -427,7 +437,7 @@ jobs:
         run: |
           set -euo pipefail
           digest() { docker buildx imagetools inspect "$GHCR_IMAGE:$1" --format '{{json .Manifest}}' | jq -r .digest; }
-          d_al=$(digest "$BUILD_TAG"); d_deb=$(digest "$BUILD_TAG-debian")
+          d_al=$(digest "$BUILD_TAG"); d_deb=$(digest "$BUILD_TAG-debian"); d_dl=$(digest "$BUILD_TAG-distroless")
           v="${UPSTREAM%.*}-${UPSTREAM##*.}"
           upstream_url="https://github.com/aws/aws-emulator/releases/tag/v$VERSION"
           upstream_notes=$(gh api "repos/aws/aws-emulator/releases/tags/v$VERSION" -q .body 2>/dev/null || true)
@@ -441,6 +451,7 @@ jobs:
             echo "|---|---|---|---|"
             echo "| Amazon Linux | \`docker pull ghcr.io/xsavikx/aws-emulator:$UPSTREAM\` | \`$BUILD_TAG\` | \`$d_al\` |"
             echo "| Debian | \`docker pull ghcr.io/xsavikx/aws-emulator:$UPSTREAM-debian\` | \`$BUILD_TAG-debian\` | \`$d_deb\` |"
+            echo "| Distroless | \`docker pull ghcr.io/xsavikx/aws-emulator:$UPSTREAM-distroless\` | \`$BUILD_TAG-distroless\` | \`$d_dl\` |"
             echo
             echo "The same tags are on \`docker.io/xsavikx/aws-emulator\` and \`quay.io/xsavikx/aws-emulator\`. Platforms: \`linux/amd64\`, \`linux/arm64\`."
             echo

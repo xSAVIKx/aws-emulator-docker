@@ -50,11 +50,17 @@ Podman, containerd and Kubernetes on Linux run them natively.
 |---|---|---|
 | Amazon Linux (default) | `amazonlinux:2023-minimal` | `latest`, `1.0.322.1`, ... |
 | Debian | `debian:trixie-slim` (Debian 13) | `debian`, `latest-debian`, `1.0.322.1-debian`, `1.0-debian`, ... |
+| Distroless | `gcr.io/distroless/cc-debian13` | `distroless`, `latest-distroless`, `1.0.322.1-distroless`, ... |
 
 Each tag of the default variant has a Debian twin with the `-debian` suffix. Both variants
 install the same upstream emulator: the Amazon Linux variant from the `.rpm` package, the
 Debian variant from the `.deb` package. Both have the same entry point, user, port and
 health check. Use the Debian variant if your tooling expects `apt` and Debian.
+
+The distroless variant contains only glibc, the emulator and a small static health check
+program. It has no shell, no package manager and no `curl`, so security scanners report
+very few findings. You cannot `docker exec` a shell into it. Its Docker `HEALTHCHECK` works
+the same way as in the other variants.
 
 The version tags move when the image is rebuilt (for example for a base image fix). For
 reproducible builds, pin a build tag or a digest. Each build is listed in the
@@ -201,6 +207,7 @@ gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx
 ```sh
 docker buildx build --platform linux/amd64,linux/arm64 -t aws-emulator .
 docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile.debian -t aws-emulator:debian .
+docker buildx build --platform linux/amd64,linux/arm64 -f Dockerfile.distroless -t aws-emulator:distroless .
 ```
 
 The Dockerfile downloads the pinned LTS RPM for each target architecture and checks its

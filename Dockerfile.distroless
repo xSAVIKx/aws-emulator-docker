@@ -1,0 +1,109 @@
+# syntax=docker/dockerfile:1.10
+#
+# Distroless variant of the AWS Emulator container image
+# (https://github.com/aws/aws-emulator). The runtime image has glibc and the
+# emulator only: no shell, no package manager, no curl.
+#
+# Maintainer: Yurii Serhiichuk <yurii@serhiichuk.dev>
+# SPDX-License-Identifier: Apache-2.0
+
+ARG BASE_IMAGE=gcr.io/distroless/cc-debian13@sha256:e1f5543d45a2cd7c02a5b43dda5f0ff30729b4832113759d01ed39b0b152cddb
+ARG FETCH_IMAGE=debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
+ARG GO_IMAGE=golang:1.27-trixie@sha256:c47c3fda018d13d43a6bf5ebac3e5bba8a23a35782aa4faf531afaf47c64c39f
+
+# ---------------------------------------------------------------------------
+# Stage 1: download the .deb for the target architecture, verify it, and
+# extract the emulator files.
+# ---------------------------------------------------------------------------
+FROM --platform=$BUILDPLATFORM ${FETCH_IMAGE} AS fetch
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ARG TARGETARCH
+# Upstream package version from versions.json, for example 1.0.322.1.
+# Set it to "latest" to use the moving LTS/latest URL.
+ARG EMULATOR_VERSION=1.0.322.1
+ARG EMULATOR_CHANNEL=LTS
+ARG EMULATOR_DOWNLOAD_BASE=https://downloads.aws.com/aws-emulator/packages/aws-emulator
+# AWS package signing key "SSM Publishing <ssm-publishing@amazon.com>".
+ARG PKG_SIGNER_FINGERPRINT=98BCF336A3BE53B734E967C52E5BF49BD940F624
+ARG DEB_SHA256_AMD64=""
+ARG DEB_SHA256_ARM64=""
+ARG EMULATOR_UID=1000
+ARG EMULATOR_GID=1000
+# hadolint ignore=DL3008
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && rm -rf /var/lib/apt/lists/*
+COPY keys/aws-emulator-signing-key.asc /keys/aws-emulator-signing-key.asc
+RUN set -eu; \
+    case "${TARGETARCH}" in \
+      amd64|arm64) deb_arch="${TARGETARCH}" ;; \
+      *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    if [ "${TARGETARCH}" = amd64 ]; then want="${DEB_SHA256_AMD64}"; else want="${DEB_SHA256_ARM64}"; fi; \
+    base="${EMULATOR_DOWNLOAD_BASE}/${EMULATOR_CHANNEL}"; \
+    if [ "${EMULATOR_VERSION}" = "latest" ]; then \
+      url="${base}/latest/aws-emulator_${deb_arch}.deb"; \
+    else \
+      url="${base}/aws-emulator_${EMULATOR_VERSION%.*}-${EMULATOR_VERSION##*.}_${deb_arch}.deb"; \
+    fi; \
+    echo "Downloading ${url}"; \
+    curl -fsSL --retry 5 --retry-all-errors -o /aws-emulator.deb "${url}"; \
+    curl -fsSL --retry 5 --retry-all-errors -o /aws-emulator.deb.sig "${url}.sig"; \
+    if [ -n "${want}" ]; then echo "${want}  /aws-emulator.deb" | sha256sum -c -; fi; \
+    export GNUPGHOME=/tmp/gnupg; mkdir -m 700 "${GNUPGHOME}"; \
+    gpg --batch --quiet --import /keys/aws-emulator-signing-key.asc; \
+    gpg --batch --status-fd 1 --verify /aws-emulator.deb.sig /aws-emulator.deb \
+      | tee /dev/stderr | grep "^\[GNUPG:\] VALIDSIG ${PKG_SIGNER_FINGERPRINT} " >/dev/null; \
+    rm -rf "${GNUPGHOME}"; \
+    mkdir -p /out; dpkg-deb -x /aws-emulator.deb /out; \
+    test -x /out/opt/aws-emulator/bin/aws-emulator; \
+    mkdir -p /home-skel/emulator/.aws/emulator; \
+    chown -R "${EMULATOR_UID}:${EMULATOR_GID}" /home-skel/emulator
+
+# ---------------------------------------------------------------------------
+# Stage 2: a static health check program (no shell in the runtime image).
+# ---------------------------------------------------------------------------
+FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS healthcheck
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY healthcheck/ ./
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /aws-emulator-healthcheck .
+
+# ---------------------------------------------------------------------------
+# Stage 3: runtime image.
+# ---------------------------------------------------------------------------
+FROM ${BASE_IMAGE}
+
+ARG EMULATOR_UID=1000
+ARG EMULATOR_GID=1000
+ARG BASE_IMAGE
+
+LABEL org.opencontainers.image.title="AWS Emulator (distroless)" \
+      org.opencontainers.image.description="Multi-arch distroless container image of the AWS Emulator, a local emulator of the AWS APIs. No shell, no package manager. Unofficial community build." \
+      org.opencontainers.image.authors="Yurii Serhiichuk <yurii@serhiichuk.dev>" \
+      org.opencontainers.image.vendor="Yurii Serhiichuk" \
+      org.opencontainers.image.url="https://github.com/xSAVIKx/aws-emulator-docker" \
+      org.opencontainers.image.source="https://github.com/xSAVIKx/aws-emulator-docker" \
+      org.opencontainers.image.documentation="https://github.com/xSAVIKx/aws-emulator-docker#readme" \
+      org.opencontainers.image.licenses="Apache-2.0 AND CC0-1.0" \
+      org.opencontainers.image.base.name="${BASE_IMAGE}"
+
+COPY --from=fetch /out/opt/aws-emulator /opt/aws-emulator
+COPY --from=fetch --chown=${EMULATOR_UID}:${EMULATOR_GID} /home-skel/emulator /home/emulator
+COPY --from=healthcheck /aws-emulator-healthcheck /usr/local/bin/aws-emulator-healthcheck
+
+USER ${EMULATOR_UID}:${EMULATOR_GID}
+ENV HOME=/home/emulator \
+    PATH=/opt/aws-emulator/bin:/usr/local/bin:/usr/bin:/bin \
+    EMULATOR_HEALTHCHECK_PORT=9297
+WORKDIR /home/emulator
+
+EXPOSE 9297
+STOPSIGNAL SIGTERM
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["/usr/local/bin/aws-emulator-healthcheck"]
+
+ENTRYPOINT ["/opt/aws-emulator/bin/aws-emulator", "-b", "0.0.0.0"]

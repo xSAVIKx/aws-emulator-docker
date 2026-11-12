@@ -376,7 +376,7 @@ footer{border-top:1px solid var(--line);margin-top:64px;padding:24px 0 40px;colo
 
 <main class="wrap" id="content" tabindex="-1">
 <section class="hero">
-  <span class="badge">Upstream version <b id="ver">__VERSION__</b> · linux/amd64 · linux/arm64 · Amazon Linux and Debian</span>
+  <span class="badge">Upstream version <b id="ver">__VERSION__</b> · linux/amd64 · linux/arm64 · Amazon Linux, Debian and distroless</span>
   <h1>The <span>AWS Emulator</span>, ready to run in Docker.</h1>
   <p class="lead">AWS does not publish a prebuilt image of its local AWS API emulator. This project builds one, tests it on both architectures, signs it, and publishes it to three registries. A new upstream release is live within one hour.</p>
   <pre><code>docker run --rm -p 127.0.0.1:9297:9297 ghcr.io/xsavikx/aws-emulator</code><button class="copy" type="button" aria-label="Copy code to clipboard">Copy</button></pre>
@@ -647,9 +647,10 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
   <tbody>
     <tr><td>Amazon Linux (default)<br><code>amazonlinux:2023-minimal</code></td><td><code>latest</code>, <code>__VERSION__</code>, ...</td></tr>
     <tr><td>Debian<br><code>debian:trixie-slim</code></td><td><code>debian</code>, <code>latest-debian</code>, <code>__VERSION__-debian</code>, ...</td></tr>
+    <tr><td>Distroless<br><code>gcr.io/distroless/cc-debian13</code></td><td><code>distroless</code>, <code>latest-distroless</code>, <code>__VERSION__-distroless</code>, ...</td></tr>
   </tbody>
 </table></div>
-<p class="muted">Each tag of the default variant has a Debian twin with the <code>-debian</code> suffix. Both install the same upstream emulator, from the <code>.rpm</code> or the <code>.deb</code> package, and both behave the same way.</p>
+<p class="muted">Each tag of the default variant has a Debian twin with the <code>-debian</code> suffix and a distroless twin with the <code>-distroless</code> suffix. The distroless variant has no shell, no package manager and no <code>curl</code>, so scanners report very few findings. Both install the same upstream emulator, from the <code>.rpm</code> or the <code>.deb</code> package, and both behave the same way.</p>
 
 <h2 id="verify">Verify the image</h2>
 <p>Each image has a keyless cosign signature from GitHub Actions. Use cosign v3 or later. Cosign v2 reports "no signatures found".</p>
