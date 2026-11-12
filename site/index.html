@@ -584,7 +584,7 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
 <div class="tablewrap"><table>
   <thead><tr><th scope="col">Runner</th><th scope="col">Result</th></tr></thead>
   <tbody>
-    <tr><td>Ubuntu 22.04, 24.04 and 26.04 (GitHub-hosted): <code>ubuntu-latest</code> (x64), <code>ubuntu-22.04</code>, <code>ubuntu-24.04</code> and <code>ubuntu-26.04</code> (x64), <code>ubuntu-22.04-arm</code>, <code>ubuntu-24.04-arm</code> and <code>ubuntu-26.04-arm</code> (arm64)</td><td>Supported. The CI of the action tests the action on these runners on each change. The six language examples run every day and after each image release.</td></tr>
+    <tr><td>Ubuntu 24.04 and 26.04 (GitHub-hosted): <code>ubuntu-latest</code> (x64), <code>ubuntu-24.04</code> and <code>ubuntu-26.04</code> (x64), <code>ubuntu-24.04-arm</code> and <code>ubuntu-26.04-arm</code> (arm64)</td><td>Supported. The CI of the action tests the action on these runners on each change. The six language examples run every day and after each image release.</td></tr>
     <tr><td>Self-hosted Linux with Docker or Podman</td><td>Supported. The CI of the action tests Podman on Ubuntu 24.04 and 26.04. Rootless Docker is expected to work, tested manually.</td></tr>
     <tr><td>macOS, Windows and <code>ubuntu-slim</code> (GitHub-hosted)</td><td>Not supported: these runners have no Docker for Linux containers. The action stops immediately with a clear message.</td></tr>
   </tbody>

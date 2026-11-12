@@ -52,7 +52,7 @@ jobs:
         lang: [python, typescript, java, go, dotnet, rust]
         # Push and pull request runs use one Ubuntu version. Scheduled, manual and
         # post-publish runs use all supported versions.
-        os: ${{ fromJSON((inputs.full || github.event_name == 'schedule') && '["ubuntu-22.04","ubuntu-24.04","ubuntu-26.04"]' || '["ubuntu-24.04"]') }}
+        os: ${{ fromJSON((inputs.full || github.event_name == 'schedule') && '["ubuntu-24.04","ubuntu-26.04"]' || '["ubuntu-24.04"]') }}
         arch: ["", "-arm"]
     runs-on: ${{ matrix.os }}${{ matrix.arch }}
     timeout-minutes: 30
@@ -85,8 +85,8 @@ jobs:
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           workspaces: examples/rust
-          # One cache per runner image: C code (aws-lc-sys) built on a newer
-          # glibc does not link on Ubuntu 22.04.
+          # One cache per runner image: C code (aws-lc-sys) built on one
+          # glibc version does not always link on an older one.
           key: ${{ matrix.os }}${{ matrix.arch }}
       - if: matrix.lang == 'dotnet'
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
