@@ -24,6 +24,47 @@ A blog post about `docker run`, Compose, GitHub Actions and known problems:
 > This is an unofficial community project. It is not affiliated with or endorsed by
 > Amazon Web Services.
 
+## Quick start
+
+```sh
+mkdir -p ~/.aws/emulator
+docker run --rm -p 127.0.0.1:9297:9297 --user "$(id -u):$(id -g)" \
+  -e HOME="$HOME" -v "$HOME/.aws/emulator:$HOME/.aws/emulator" ghcr.io/xsavikx/aws-emulator
+```
+
+In a second terminal:
+
+```sh
+export AWS_ENDPOINT_URL=https://127.0.0.1:9297 AWS_CA_BUNDLE=~/.aws/emulator/9297/ca.pem \
+  AWS_SHARED_CREDENTIALS_FILE=~/.aws/emulator/9297/emulator_credentials AWS_CONFIG_FILE=~/.aws/emulator/9297/config
+aws sts get-caller-identity   # "Account": "000000000000"
+```
+
+With rootless Docker, use `--user 0:0`. In CI, use the
+[Run AWS Emulator](https://github.com/marketplace/actions/run-aws-emulator) action. For
+Windows, SDKs and Compose, see [Run it step by step](#run-it-step-by-step).
+
+### Compared with the image from the AWS guide
+
+The [AWS guide](https://docs.aws.amazon.com/emulator/latest/userguide/getting-started-docker.html)
+tells you to build the image yourself. This project gives you a built image that is also smaller:
+
+| Image (`linux/amd64`, uncompressed) | Size |
+|---|---|
+| Built with the Dockerfile from the AWS guide | 1.86 GB |
+| This project, Amazon Linux (default) | 1.49 GB |
+| This project, Debian | 1.48 GB |
+| This project, distroless | 1.39 GB |
+
+The guide's Dockerfile uses `ADD` for the RPM package. The `rm` in the next step does not
+remove the 180 MB package from the image, because the package stays in the `ADD` layer.
+This project mounts the package only for the install step. Measured on 2026-11-14 with
+emulator 1.0.367 (guide) and 1.0.366 (this project).
+
+The guide's image also does not check the package signature and runs no tests. This project
+checks the AWS signature on each package, tests each image, and signs it. See
+[Supply chain](#supply-chain).
+
 ## Images
 
 | Registry | Image |
@@ -72,7 +113,7 @@ The version tags move when the image is rebuilt (for example for a base image fi
 reproducible builds, pin a build tag or a digest. Each build is listed in the
 [releases](https://github.com/xSAVIKx/aws-emulator-docker/releases).
 
-## Quick start
+## Run it step by step
 
 1. Create the working directory before the first start:
 
@@ -223,6 +264,15 @@ Verify the GitHub attestation:
 ```sh
 gh attestation verify oci://ghcr.io/xsavikx/aws-emulator:latest --owner xSAVIKx --format json
 ```
+
+### What a correct signature tells you
+
+The AWS signature on the package tells you that the emulator binary comes from AWS. The
+cosign signature and the attestations tell you that the image comes from the release
+workflow of this repository, from a known commit. These checks do not tell you that the
+emulator code is free of defects. This project does not review or change the upstream code.
+Use the emulator for local and CI tests only. Do not give it real AWS credentials or
+production data.
 
 ## Build it yourself
 
