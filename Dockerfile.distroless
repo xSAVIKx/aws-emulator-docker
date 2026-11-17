@@ -70,13 +70,13 @@ ARG TARGETARCH
 WORKDIR /src/entrypoint
 COPY entrypoint/go.mod entrypoint/go.sum ./
 RUN go mod download
-WORKDIR /src
-COPY healthcheck/ ./healthcheck/
-COPY entrypoint/ ./entrypoint/
-RUN cd healthcheck && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -trimpath -ldflags="-s -w" -o /aws-emulator-healthcheck . \
- && cd ../entrypoint && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+COPY entrypoint/ ./
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath -ldflags="-s -w" -o /aws-emulator-entrypoint .
+WORKDIR /src/healthcheck
+COPY healthcheck/ ./
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /aws-emulator-healthcheck .
 
 # ---------------------------------------------------------------------------
 # Stage 3: runtime image.
