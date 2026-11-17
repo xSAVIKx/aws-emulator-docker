@@ -43,7 +43,7 @@ aws sts get-caller-identity   # Account 000000000000
 - Rootless Docker: use `--user 0:0`. Podman: `--userns=keep-id`.
 - Use 127.0.0.1, not localhost, and path-style S3 addresses.
 - AWS SDK for JavaScript v3: set `useQueueUrlAsEndpoint: false` on SQSClient, or SQS requests go to real AWS.
-- Other containers cannot reach the emulator by service name: the certificate names only localhost, 127.0.0.1 and ::1.
+- Other containers: the emulator certificate names only localhost, 127.0.0.1 and ::1. Set `EMULATOR_TLS_NAMES=aws` to add a service name; the image then serves a certificate from its own CA and writes the CA to `~/.aws/emulator/<port>/tls-ca.pem`. `EMULATOR_HTTP_PORT` adds a plain HTTP port. See https://github.com/xSAVIKx/aws-emulator-docker#call-it-from-other-containers.
 - All state is in memory. Give the container 2 GiB.
 - Image size (linux/amd64, uncompressed): about 1.49 GB (Amazon Linux), 1.48 GB (Debian), 1.39 GB (distroless). The image from the Dockerfile in the AWS guide is about 1.86 GB.
 - The signatures prove where the binary and the image come from. They do not prove that the emulator code is free of defects. Use it for tests only, without real AWS credentials.

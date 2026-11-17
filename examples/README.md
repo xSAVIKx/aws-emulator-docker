@@ -15,6 +15,9 @@ example on `linux/amd64` and `linux/arm64`
 | C# (.NET) | [`dotnet/`](dotnet/) | xUnit | AWS SDK for .NET |
 | Rust | [`rust/`](rust/) | `cargo test` + Tokio | AWS SDK for Rust |
 
+[`compose/`](compose/) is a Docker Compose example. A client container calls the emulator by
+its service name, `https://aws:9297`, through the TLS front end of the image.
+
 ## Scenarios
 
 Every example has one test for each scenario:

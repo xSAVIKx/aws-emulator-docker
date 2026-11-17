@@ -7,10 +7,16 @@ set -euo pipefail
 
 IMAGE="${1:?usage: $0 <image>}"
 PORT="${PORT:-19297}"
-WORK="$(mktemp -d)"
+WORK="${WORK:-$(mktemp -d)}"
 H="$WORK/home"
 D="$H/.aws/emulator/$PORT"
 NAME="aws-emulator-smoke-$$"
+# With rootless Docker, container root maps to the host user.
+if docker info -f '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless; then
+  USER_SPEC=0:0
+else
+  USER_SPEC="$(id -u):$(id -g)"
+fi
 
 cleanup() {
   docker logs "$NAME" >"$WORK/container.log" 2>&1 || true
@@ -32,7 +38,7 @@ echo "== start with bind mount on port $PORT"
 mkdir -p "$H/.aws/emulator"
 docker run -d --name "$NAME" --memory=2g --memory-swap=2g \
   -p "127.0.0.1:$PORT:$PORT" \
-  --user "$(id -u):$(id -g)" \
+  --user "$USER_SPEC" \
   -e HOME="$H" -e EMULATOR_TELEMETRY=off -e EMULATOR_HEALTHCHECK_PORT="$PORT" \
   -v "$H/.aws/emulator:$H/.aws/emulator" \
   "$IMAGE" -p "$PORT" >/dev/null

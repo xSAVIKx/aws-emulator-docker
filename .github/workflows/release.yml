@@ -9,6 +9,7 @@ on:
       - ".dockerignore"
       - "healthcheck.sh"
       - "healthcheck/**"
+      - "entrypoint/**"
       - "keys/**"
       - "tests/**"
       - ".github/workflows/release.yml"
@@ -114,7 +115,7 @@ jobs:
               rev=$(docker buildx imagetools inspect --raw "$GHCR_IMAGE:latest" 2>/dev/null \
                 | jq -r '.annotations["org.opencontainers.image.revision"] // empty' || true)
               if [ -n "$rev" ] && git cat-file -e "$rev^{commit}" 2>/dev/null; then
-                if ! git diff --quiet "$rev" HEAD -- 'Dockerfile*' .dockerignore healthcheck.sh healthcheck keys tests .github/workflows/release.yml; then
+                if ! git diff --quiet "$rev" HEAD -- 'Dockerfile*' .dockerignore healthcheck.sh healthcheck entrypoint keys tests .github/workflows/release.yml; then
                   echo "Image files changed since $rev."; publish=true
                 fi
               fi ;;
@@ -226,6 +227,10 @@ jobs:
       - name: Smoke test
         shell: bash
         run: ./tests/smoke.sh "${IMAGE_NAME}:ci"
+
+      - name: TLS front end test
+        shell: bash
+        run: ./tests/tls.sh "${IMAGE_NAME}:ci"
 
       - name: Log in to GHCR
         if: needs.resolve.outputs.publish == 'true'

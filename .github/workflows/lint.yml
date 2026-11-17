@@ -29,7 +29,19 @@ jobs:
         with:
           dockerfile: Dockerfile.distroless
       - name: ShellCheck
-        run: shellcheck healthcheck.sh tests/smoke.sh examples/*.sh examples/*/run-tests.sh .github/actions/aws-emulator/start-emulator.sh
+        run: shellcheck healthcheck.sh tests/smoke.sh tests/tls.sh examples/*.sh examples/*/run-tests.sh .github/actions/aws-emulator/start-emulator.sh
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: entrypoint/go.mod
+          cache-dependency-path: |
+            entrypoint/go.sum
+            healthcheck/go.mod
+      - name: Go vet and test (entrypoint and health check)
+        run: |
+          set -euo pipefail
+          for d in entrypoint healthcheck; do
+            (cd "$d" && test -z "$(gofmt -l .)" && go vet ./... && go test ./...)
+          done
       - name: actionlint
         env:
           ACTIONLINT_VERSION: 1.7.12

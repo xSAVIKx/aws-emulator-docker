@@ -2,3 +2,4 @@
 !healthcheck.sh
 !keys/
 !healthcheck/
+!entrypoint/
