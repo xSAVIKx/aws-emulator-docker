@@ -192,6 +192,74 @@ UID_GID="$(id -u):$(id -g)" docker compose up
 UID_GID=0:0 docker compose up
 ```
 
+## Call it from other containers
+
+The emulator certificate names only `localhost`, `127.0.0.1` and `::1`
+([aws/aws-emulator#23](https://github.com/aws/aws-emulator/issues/23)). A client in another
+container that calls `https://aws:9297` therefore fails TLS validation. The image has an
+optional TLS front end for this case. Set one of these variables to turn it on:
+
+| Variable | Effect |
+|---|---|
+| `EMULATOR_TLS_NAMES` | More names for the certificate, separated by commas: service names, host names, IP addresses, or wildcards such as `*.example.test`. |
+| `EMULATOR_TLS_CA_CERT`, `EMULATOR_TLS_CA_KEY` | Your own CA certificate and key (PEM files) to sign the certificate. |
+| `EMULATOR_HTTP_PORT` | A second port that accepts plain HTTP, for a private network. |
+
+With the front end, the emulator listens on `127.0.0.1` in the container. The front end
+listens on the same port on the other addresses of the container. It serves a certificate
+for these names:
+
+- `localhost`, `*.localhost`, `000000000000.localhost` (S3 Control), `127.0.0.1` and `::1`,
+- the container host name and its IP addresses,
+- the names in `EMULATOR_TLS_NAMES`.
+
+The front end passes each connection to the emulator without changes, so SigV4
+signatures, presigned URLs and queue URLs work as before. A CA signs the certificate. The
+front end makes the CA at the first start and keeps it in `~/.aws/emulator/tls/`. When that
+folder is on a volume, the CA stays the same after a restart. In
+`~/.aws/emulator/<port>/`, the front end writes:
+
+- `tls-ca.pem`: the CA only. Give this file to clients in other containers.
+- `ca.pem` and `truststore.p12`: the CA and the emulator certificate. Clients on the host
+  can use these files as before.
+
+The Docker health check reports healthy only after the front end is ready.
+[`examples/compose/compose.yaml`](examples/compose/compose.yaml) is a complete example. CI
+tests the front end at each build with [`tests/tls.sh`](tests/tls.sh).
+
+```yaml
+services:
+  aws:
+    image: ghcr.io/xsavikx/aws-emulator:latest
+    environment:
+      EMULATOR_TLS_NAMES: aws
+    volumes:
+      - emulator:/home/emulator/.aws/emulator
+  tests:
+    image: public.ecr.aws/aws-cli/aws-cli:latest
+    depends_on:
+      aws: { condition: service_healthy }
+    environment:
+      AWS_ENDPOINT_URL: https://aws:9297
+      AWS_CA_BUNDLE: /emulator/9297/tls-ca.pem
+      AWS_SHARED_CREDENTIALS_FILE: /emulator/9297/emulator_credentials
+      AWS_REGION: us-east-1
+    volumes:
+      - emulator:/emulator:ro
+    command: ["sts", "get-caller-identity"]
+volumes:
+  emulator:
+```
+
+Limits of the front end:
+
+- Do not set `-b`, and do not use `-p 0`. The front end needs a fixed port.
+- Do not use it with `--network host`. Use a container network.
+- OpenSSL and curl do not accept `*.localhost` for `bucket.localhost`. Use path-style S3
+  addresses.
+- The emulator files belong to UID 1000. Run the client container as UID 1000 or as root,
+  or give the emulator the same user as the client.
+
 ## Examples and GitHub Action
 
 - [`examples/`](examples/) has integration tests in Python (pytest), TypeScript (Vitest),
@@ -229,9 +297,8 @@ UID_GID=0:0 docker compose up
   with your own UID, the emulator stops with `Permission denied (os error 13)`. With Podman,
   use `--userns=keep-id`.
 - **Other containers.** The emulator certificate names only `localhost`, `127.0.0.1` and
-  `::1`. A client in another container that calls `https://aws-emulator:9297` fails TLS
-  validation. Run the client in the network namespace of the emulator instead
-  (`docker run --network container:<emulator> ...` with `https://127.0.0.1:<port>`).
+  `::1`. To call the emulator by a service name, set `EMULATOR_TLS_NAMES`. See
+  [Call it from other containers](#call-it-from-other-containers).
 - **Use `127.0.0.1`, not `localhost`.** With a host name, some SDKs use virtual-hosted S3
   addresses such as `bucket.localhost`. These addresses do not resolve. The AWS SDK for
   JavaScript v3 is an example of such an SDK.

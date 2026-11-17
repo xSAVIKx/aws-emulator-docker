@@ -8,6 +8,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ARG BASE_IMAGE=public.ecr.aws/amazonlinux/amazonlinux:2023-minimal@sha256:61cf86a8168c2e0b8fc6b6badaac64968044c947718508d88fac06e61a596e6d
+ARG GO_IMAGE=golang:1.27-trixie@sha256:c47c3fda018d13d43a6bf5ebac3e5bba8a23a35782aa4faf531afaf47c64c39f
 
 # ---------------------------------------------------------------------------
 # Stage 1: download the RPM for the target architecture and verify it.
@@ -55,6 +56,19 @@ RUN set -eu; \
     rpmkeys --checksig /aws-emulator.rpm | tee /dev/stderr | grep -Eq ': (digests )?signatures OK$'
 
 # ---------------------------------------------------------------------------
+# Build stage: the entrypoint program with the optional TLS front end.
+# ---------------------------------------------------------------------------
+FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS entrypoint
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY entrypoint/go.mod entrypoint/go.sum ./
+RUN go mod download
+COPY entrypoint/ ./
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /aws-emulator-entrypoint .
+
+# ---------------------------------------------------------------------------
 # Stage 2: runtime image.
 # ---------------------------------------------------------------------------
 FROM ${BASE_IMAGE}
@@ -84,6 +98,7 @@ RUN --mount=type=bind,from=fetch,source=/aws-emulator.rpm,target=/mnt/pkg/aws-em
     aws-emulator --version
 
 COPY --chmod=0755 healthcheck.sh /usr/local/bin/aws-emulator-healthcheck
+COPY --from=entrypoint /aws-emulator-entrypoint /usr/local/bin/aws-emulator-entrypoint
 
 USER ${EMULATOR_UID}:${EMULATOR_GID}
 ENV HOME=/home/emulator \
@@ -96,4 +111,4 @@ STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
     CMD ["/usr/local/bin/aws-emulator-healthcheck"]
 
-ENTRYPOINT ["aws-emulator", "-b", "0.0.0.0"]
+ENTRYPOINT ["/usr/local/bin/aws-emulator-entrypoint"]

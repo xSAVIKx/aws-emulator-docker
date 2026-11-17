@@ -7,6 +7,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ARG BASE_IMAGE=debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
+ARG GO_IMAGE=golang:1.27-trixie@sha256:c47c3fda018d13d43a6bf5ebac3e5bba8a23a35782aa4faf531afaf47c64c39f
 
 # ---------------------------------------------------------------------------
 # Stage 1: download the .deb for the target architecture and verify it.
@@ -57,6 +58,19 @@ RUN set -eu; \
     rm -rf "${GNUPGHOME}"
 
 # ---------------------------------------------------------------------------
+# Build stage: the entrypoint program with the optional TLS front end.
+# ---------------------------------------------------------------------------
+FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS entrypoint
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY entrypoint/go.mod entrypoint/go.sum ./
+RUN go mod download
+COPY entrypoint/ ./
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /aws-emulator-entrypoint .
+
+# ---------------------------------------------------------------------------
 # Stage 2: runtime image.
 # ---------------------------------------------------------------------------
 FROM ${BASE_IMAGE}
@@ -88,6 +102,7 @@ RUN --mount=type=bind,from=fetch,source=/aws-emulator.deb,target=/mnt/pkg/aws-em
     aws-emulator --version
 
 COPY --chmod=0755 healthcheck.sh /usr/local/bin/aws-emulator-healthcheck
+COPY --from=entrypoint /aws-emulator-entrypoint /usr/local/bin/aws-emulator-entrypoint
 
 USER ${EMULATOR_UID}:${EMULATOR_GID}
 ENV HOME=/home/emulator \
@@ -100,4 +115,4 @@ STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
     CMD ["/usr/local/bin/aws-emulator-healthcheck"]
 
-ENTRYPOINT ["aws-emulator", "-b", "0.0.0.0"]
+ENTRYPOINT ["/usr/local/bin/aws-emulator-entrypoint"]
