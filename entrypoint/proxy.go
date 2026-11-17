@@ -4,7 +4,6 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -131,25 +130,28 @@ func probe(runDir, upstream string) (*x509.Certificate, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	block, _ := pem.Decode(data)
-	if block == nil {
+	// After a crash, ca.pem can still hold the front end CA first. Trust
+	// every certificate in the file, and take the one that the emulator
+	// serves.
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(data) {
 		return nil, "", errors.New("ca.pem has no certificate yet")
 	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, "", err
-	}
-	roots := x509.NewCertPool()
-	roots.AddCert(cert)
 	cfg := &tls.Config{RootCAs: roots, NextProtos: []string{"h2", "http/1.1"}, MinVersion: tls.VersionTLS12}
 	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 2 * time.Second}, "tcp", upstream, cfg)
 	if err != nil {
 		return nil, "", err
 	}
-	protocol := conn.ConnectionState().NegotiatedProtocol
+	state := conn.ConnectionState()
 	_ = conn.Close()
+	cert := state.PeerCertificates[0]
 
-	client := &http.Client{Timeout: 4 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}}}
+	only := x509.NewCertPool()
+	only.AddCert(cert)
+	client := &http.Client{Timeout: 4 * time.Second, Transport: &http.Transport{
+		TLSClientConfig:   &tls.Config{RootCAs: only, MinVersion: tls.VersionTLS12},
+		DisableKeepAlives: true,
+	}}
 	resp, err := client.Get("https://" + upstream + "/__admin/health")
 	if err != nil {
 		return nil, "", err
@@ -159,7 +161,7 @@ func probe(runDir, upstream string) (*x509.Certificate, string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", fmt.Errorf("health route: HTTP %d", resp.StatusCode)
 	}
-	return cert, protocol, nil
+	return cert, state.NegotiatedProtocol, nil
 }
 
 func serveTLS(c net.Conn, serverTLS *tls.Config, upstream string, upstreamTLS *tls.Config) {
@@ -200,19 +202,30 @@ func servePlain(c net.Conn, upstream string, upstreamTLS *tls.Config) {
 
 type closeWriter interface{ CloseWrite() error }
 
+// drainTimeout is how long a connection can stay half open after one side
+// stops sending.
+const drainTimeout = 30 * time.Second
+
 // pipe copies the bytes in both directions. When one side stops sending,
 // it closes the write half of the other side, so that a response can still
-// arrive.
+// arrive, and it gives the other direction drainTimeout to finish. An error
+// in one direction closes both connections.
 func pipe(a, b net.Conn) {
 	var wg sync.WaitGroup
 	cp := func(dst, src net.Conn) {
 		defer wg.Done()
-		_, _ = io.Copy(dst, src)
+		_, err := io.Copy(dst, src)
+		if err != nil {
+			_ = a.Close()
+			_ = b.Close()
+			return
+		}
 		if cw, ok := dst.(closeWriter); ok {
 			_ = cw.CloseWrite()
 		} else {
 			_ = dst.Close()
 		}
+		_ = dst.SetReadDeadline(time.Now().Add(drainTimeout))
 	}
 	wg.Add(2)
 	go cp(a, b)

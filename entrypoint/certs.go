@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	pkcs12 "software.sslmate.com/src/go-pkcs12"
@@ -34,31 +35,47 @@ type authority struct {
 
 // loadOrCreateCA loads the CA from the configured files. Without them, it
 // loads the CA from dir, or makes a new CA and saves it in dir. A saved CA
-// stays the same when the home folder is a volume, so a client can trust it
-// once.
+// stays the same when dir is on a volume, so a client can trust it once.
+// A lock file stops two containers that share dir from writing two CAs.
 func loadOrCreateCA(cfg config, dir string) (*authority, error) {
 	if cfg.caCert != "" {
 		return loadCA(cfg.caCert, cfg.caKey)
 	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		logf("cannot make %s, so the CA is only in memory and changes at each start: %v", dir, err)
+		ca, _, err := newCA()
+		return ca, err
+	}
+	lock, err := os.OpenFile(filepath.Join(dir, ".lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("cannot open the CA lock file: %w", err)
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+		return nil, fmt.Errorf("cannot lock the CA folder: %w", err)
+	}
+	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN) //nolint:errcheck
+
 	certFile, keyFile := filepath.Join(dir, "ca.pem"), filepath.Join(dir, "ca-key.pem")
-	if _, err := os.Stat(certFile); err == nil {
+	_, err = os.Stat(certFile)
+	switch {
+	case err == nil:
 		return loadCA(certFile, keyFile)
+	case !errors.Is(err, os.ErrNotExist):
+		return nil, fmt.Errorf("cannot read the CA in %s: %w", dir, err)
 	}
 	ca, keyPEM, err := newCA()
 	if err != nil {
 		return nil, fmt.Errorf("cannot make a CA: %w", err)
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		logf("cannot save the CA in %s, it is only in memory: %v", dir, err)
-		return ca, nil
-	}
+	// The key first: a certificate file without its key never exists.
 	if err := writeFileAtomic(keyFile, keyPEM, 0o600); err != nil {
-		logf("cannot save the CA key in %s, it is only in memory: %v", dir, err)
+		logf("cannot save the CA key in %s, so the CA is only in memory: %v", dir, err)
 		return ca, nil
 	}
 	if err := writeFileAtomic(certFile, ca.pem, 0o644); err != nil {
 		_ = os.Remove(keyFile)
-		logf("cannot save the CA in %s, it is only in memory: %v", dir, err)
+		logf("cannot save the CA in %s, so the CA is only in memory: %v", dir, err)
 	}
 	return ca, nil
 }

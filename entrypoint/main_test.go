@@ -6,6 +6,8 @@ import (
 	"crypto/x509"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 
 	pkcs12 "software.sslmate.com/src/go-pkcs12"
@@ -51,7 +53,7 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
-func TestEmulatorPort(t *testing.T) {
+func TestFrontEndPort(t *testing.T) {
 	cases := []struct {
 		args []string
 		env  string
@@ -63,23 +65,81 @@ func TestEmulatorPort(t *testing.T) {
 		{[]string{"-p", "4566", "-t", "off"}, "1234", 4566, true},
 		{[]string{"--port=4567"}, "", 4567, true},
 		{[]string{"--port", "4568"}, "", 4568, true},
+		{[]string{"-p4569"}, "", 4569, true},
+		{[]string{"-p=4570"}, "", 4570, true},
+		{[]string{"-t", "-p", "-p", "4571"}, "", 4571, true},
+		{[]string{"-p", "1", "--", "-p", "2"}, "", 1, true},
 		{[]string{"-p", "0"}, "", 0, false},
 		{[]string{"-p"}, "", 0, false},
 		{[]string{"-p", "x"}, "", 0, false},
+		{[]string{"--port="}, "", 0, false},
+		{[]string{"--port", "+9298"}, "", 0, false},
 		{[]string{"-b", "0.0.0.0"}, "", 0, false},
+		{[]string{"-b127.0.0.1"}, "", 0, false},
+		{[]string{"-b=0.0.0.0"}, "", 0, false},
 		{[]string{"--bind=127.0.0.1"}, "", 0, false},
 	}
 	for _, c := range cases {
-		got, err := emulatorPort(c.args, c.env)
+		a, err := parseArgs(c.args)
+		got := 0
+		if err == nil {
+			got, err = a.frontEndPort(c.env)
+		}
 		if (err == nil) != c.ok || got != c.want {
-			t.Errorf("emulatorPort(%v, %q) = %d, %v", c.args, c.env, got, err)
+			t.Errorf("port for %v, %q = %d, %v", c.args, c.env, got, err)
 		}
 	}
 }
 
 func TestInfoOnly(t *testing.T) {
-	if !infoOnly([]string{"--version"}) || !infoOnly([]string{"-h"}) || infoOnly([]string{"-p", "1"}) {
-		t.Fatal("infoOnly is wrong")
+	for args, want := range map[string]bool{"--version": true, "-h": true, "-p 1": false, "-t -h": false, "-- -v": false} {
+		a, _ := parseArgs(strings.Fields(args))
+		if a.info != want {
+			t.Errorf("info for %q = %v, want %v", args, a.info, want)
+		}
+	}
+}
+
+func TestBlankVariable(t *testing.T) {
+	for _, v := range tlsVariables {
+		if _, err := loadConfig(env(map[string]string{v: " , "})); err == nil {
+			t.Errorf("%s with only separators: no error", v)
+		}
+	}
+}
+
+func TestConcurrentCA(t *testing.T) {
+	for run := 0; run < 20; run++ {
+		dir := t.TempDir()
+		results := make(chan *authority, 4)
+		var wg sync.WaitGroup
+		for i := 0; i < 4; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				ca, err := loadOrCreateCA(config{}, dir)
+				if err != nil {
+					t.Error(err)
+				}
+				results <- ca
+			}()
+		}
+		wg.Wait()
+		close(results)
+		var first *authority
+		for ca := range results {
+			if ca == nil {
+				continue
+			}
+			if first == nil {
+				first = ca
+			} else if !ca.cert.Equal(first.cert) {
+				t.Fatal("two containers got two different CAs")
+			}
+		}
+		if _, err := loadCA(filepath.Join(dir, "ca.pem"), filepath.Join(dir, "ca-key.pem")); err != nil {
+			t.Fatalf("the saved CA is broken: %v", err)
+		}
 	}
 }
 

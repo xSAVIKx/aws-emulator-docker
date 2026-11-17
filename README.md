@@ -215,9 +215,16 @@ for these names:
 
 The front end passes each connection to the emulator without changes, so SigV4
 signatures, presigned URLs and queue URLs work as before. A CA signs the certificate. The
-front end makes the CA at the first start and keeps it in `~/.aws/emulator/tls/`. When that
-folder is on a volume, the CA stays the same after a restart. In
-`~/.aws/emulator/<port>/`, the front end writes:
+front end makes the CA at the first start and keeps it in `~/.aws/emulator-ca/`. When you
+put that folder on a volume, the CA stays the same after a restart. The folder is not in
+`~/.aws/emulator/`, so clients that mount the run folder do not get the CA key.
+
+> [!CAUTION]
+> Do not add the CA to the trust store of an operating system or a browser. The CA can sign
+> a certificate for any name. Give it only to the test clients, for example with
+> `AWS_CA_BUNDLE`.
+
+In `~/.aws/emulator/<port>/`, the front end writes:
 
 - `tls-ca.pem`: the CA only. Give this file to clients in other containers.
 - `ca.pem` and `truststore.p12`: the CA and the emulator certificate. Clients on the host
@@ -255,6 +262,8 @@ Limits of the front end:
 
 - Do not set `-b`, and do not use `-p 0`. The front end needs a fixed port.
 - Do not use it with `--network host`. Use a container network.
+- The front end listens on the addresses that the container has at the start. It does not
+  listen on a network that you connect later with `docker network connect`.
 - OpenSSL and curl do not accept `*.localhost` for `bucket.localhost`. Use path-style S3
   addresses.
 - The emulator files belong to UID 1000. Run the client container as UID 1000 or as root,

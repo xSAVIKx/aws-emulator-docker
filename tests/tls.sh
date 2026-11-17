@@ -40,7 +40,7 @@ start() {
     --user "$USER_SPEC" \
     -e HOME="$H" -e EMULATOR_TELEMETRY=off -e EMULATOR_HEALTHCHECK_PORT="$PORT" \
     -e EMULATOR_TLS_NAMES="aws,aws.test" -e EMULATOR_HTTP_PORT="$HTTP_PORT" \
-    -v "$H/.aws/emulator:$H/.aws/emulator" \
+    -v "$H/.aws/emulator:$H/.aws/emulator" -v "$H/.aws/emulator-ca:$H/.aws/emulator-ca" \
     "$IMAGE" -p "$PORT" >/dev/null
   for _ in $(seq 90); do
     [ -s "$D/tls-ca.pem" ] && return 0
@@ -56,7 +56,7 @@ client() {
 }
 
 docker network create "$NET" >/dev/null
-mkdir -p "$H/.aws/emulator"
+mkdir -p "$H/.aws/emulator" "$H/.aws/emulator-ca"
 
 echo "== start with EMULATOR_TLS_NAMES=aws,aws.test and EMULATOR_HTTP_PORT=$HTTP_PORT"
 start
@@ -64,7 +64,7 @@ for f in emulator_credentials config ca.pem truststore.p12 tls-ca.pem; do
   [ -s "$D/$f" ] || fail "missing $D/$f"
 done
 [ "$(grep -c 'BEGIN CERTIFICATE' "$D/ca.pem")" = 2 ] || fail "ca.pem does not have two certificates"
-ca_before=$(cat "$H/.aws/emulator/tls/ca.pem")
+ca_before=$(cat "$H/.aws/emulator-ca/ca.pem")
 
 key=$(awk -F' *= *' '$1=="aws_access_key_id"{print $2}' "$D/emulator_credentials")
 secret=$(awk -F' *= *' '$1=="aws_secret_access_key"{print $2}' "$D/emulator_credentials")
@@ -122,9 +122,13 @@ code=$(docker inspect -f '{{.State.ExitCode}}' "$NAME")
 docker rm "$NAME" >/dev/null
 echo "exit code after stop: $code"
 start
-[ "$(cat "$H/.aws/emulator/tls/ca.pem")" = "$ca_before" ] || fail "the CA changed after a restart"
+[ "$(cat "$H/.aws/emulator-ca/ca.pem")" = "$ca_before" ] || fail "the CA changed after a restart"
 body=$(client -sf --cacert /run-dir/tls-ca.pem "https://aws:$PORT/__admin/health") || fail "https://aws health after restart"
 echo "restart: OK"
+
+echo "== the CA key is not in the run folder"
+[ ! -e "$H/.aws/emulator/tls" ] || fail "a CA folder is in ~/.aws/emulator"
+echo "CA key: OK"
 
 echo "== an invalid setting stops the container with a message"
 out=$(docker run --rm -e EMULATOR_TLS_NAMES='bad*name' "$IMAGE" 2>&1) && fail "a bad name was accepted"
