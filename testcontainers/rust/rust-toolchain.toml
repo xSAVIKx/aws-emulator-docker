@@ -1,0 +1,5 @@
+# The Rust version for this module. rustup reads this file and installs
+# the toolchain when it is not installed.
+[toolchain]
+channel = "1.100.0"
+profile = "minimal"

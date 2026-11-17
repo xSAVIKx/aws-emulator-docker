@@ -1,0 +1,58 @@
+{
+  "name": "testcontainers-aws-emulator",
+  "version": "0.1.0",
+  "description": "Testcontainers module for the AWS Emulator Docker image, with a TLS front end",
+  "license": "Apache-2.0",
+  "author": "Yurii Serhiichuk <yurii@serhiichuk.dev>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xSAVIKx/aws-emulator-docker.git",
+    "directory": "testcontainers/typescript"
+  },
+  "homepage": "https://github.com/xSAVIKx/aws-emulator-docker/tree/main/testcontainers/typescript#readme",
+  "bugs": "https://github.com/xSAVIKx/aws-emulator-docker/issues",
+  "keywords": [
+    "testcontainers",
+    "aws",
+    "emulator",
+    "s3",
+    "sqs",
+    "testing"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22.22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --reporter verbose",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "testcontainers": "12.2.1"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "3.1171.0",
+    "@aws-sdk/client-sqs": "3.1171.0",
+    "@aws-sdk/client-sts": "3.1171.0",
+    "@smithy/node-http-handler": "4.14.2",
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}
