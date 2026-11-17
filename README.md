@@ -275,6 +275,9 @@ Limits of the front end:
   Java (JUnit 5), Go (`go test`), C# (xUnit) and Rust (`cargo test`). They cover STS, S3,
   DynamoDB, SQS, SNS to SQS and Secrets Manager. CI runs them on amd64 and arm64 every day
   and after each image release.
+- [`testcontainers/`](testcontainers/) has Testcontainers modules for Python, TypeScript,
+  Java, Go, .NET and Rust. A test starts its own emulator and gets the endpoint, the
+  credentials and a TLS helper. No volume and no fixed port are necessary.
 - The [Run AWS Emulator](https://github.com/marketplace/actions/run-aws-emulator) GitHub Action ([source](https://github.com/xSAVIKx/run-aws-emulator)) starts
   the emulator in your own workflow and sets the SDK environment:
 
