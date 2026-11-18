@@ -4,8 +4,8 @@ This module starts the AWS Emulator image in a container for your JUnit tests.
 The container serves HTTPS with a certificate from its own CA.
 The module gives you the endpoint, the credentials, the CA, and a TLS context that trusts only that CA.
 
-- Maven coordinates: `dev.serhiichuk:testcontainers-aws-emulator`.
-- Package: `dev.serhiichuk.testcontainers.awsemulator`.
+- Maven coordinates: `io.github.xsavikx:testcontainers-aws-emulator`.
+- Package: `io.github.xsavikx.testcontainers.awsemulator`.
 - Class: `AwsEmulatorContainer`. It extends `GenericContainer<AwsEmulatorContainer>`.
 - License: Apache-2.0.
 
@@ -38,7 +38,7 @@ The package is not on Maven Central yet. Install it from the source.
 
    ```xml
    <dependency>
-     <groupId>dev.serhiichuk</groupId>
+     <groupId>io.github.xsavikx</groupId>
      <artifactId>testcontainers-aws-emulator</artifactId>
      <version>0.1.0-SNAPSHOT</version>
      <scope>test</scope>
@@ -52,7 +52,7 @@ The Apache 5 HTTP client gets the trust managers of the container.
 Thus the client trusts the emulator CA, and the JVM truststore stays unchanged.
 
 ```java
-import dev.serhiichuk.testcontainers.awsemulator.AwsEmulatorContainer;
+import io.github.xsavikx.testcontainers.awsemulator.AwsEmulatorContainer;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.apache5.Apache5HttpClient;

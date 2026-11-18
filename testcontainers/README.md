@@ -10,7 +10,7 @@ script.
 |---|---|---|---|
 | Python | [`python/`](python/) | `testcontainers-aws-emulator` | testcontainers-python |
 | TypeScript (Node.js) | [`typescript/`](typescript/) | `testcontainers-aws-emulator` | Testcontainers for Node.js |
-| Java | [`java/`](java/) | `dev.serhiichuk:testcontainers-aws-emulator` | Testcontainers for Java |
+| Java | [`java/`](java/) | `io.github.xsavikx:testcontainers-aws-emulator` | Testcontainers for Java |
 | Go | [`go/`](go/) | `github.com/xSAVIKx/aws-emulator-docker/testcontainers/go` | Testcontainers for Go |
 | C# (.NET) | [`dotnet/`](dotnet/) | `AwsEmulator.Testcontainers` | Testcontainers for .NET |
 | Rust | [`rust/`](rust/) | `testcontainers-aws-emulator` | testcontainers-rs |

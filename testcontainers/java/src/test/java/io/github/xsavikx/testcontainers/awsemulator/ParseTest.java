@@ -1,6 +1,6 @@
 // Maintainer: Yurii Serhiichuk <yurii@serhiichuk.dev>
 // SPDX-License-Identifier: Apache-2.0
-package dev.serhiichuk.testcontainers.awsemulator;
+package io.github.xsavikx.testcontainers.awsemulator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

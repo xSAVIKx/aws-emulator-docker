@@ -12,7 +12,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>dev.serhiichuk</groupId>
+  <groupId>io.github.xsavikx</groupId>
   <artifactId>testcontainers-aws-emulator</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
