@@ -285,8 +285,8 @@ docker pull ghcr.io/xsavikx/aws-emulator:1.0.322.1
 
 See [Tags](#tags) for the full list. The [releases](https://github.com/xSAVIKx/aws-emulator-docker/releases)
 page lists each build and its digest. The version numbers in the upstream issues use a
-different form than the image tags. Look for the tag in the releases before you use it. This
-project does not keep a tag for each old version.
+different form than the image tags. Look for the tag in the releases before you use it. The
+releases do not list each upstream version.
 
 ## Supply chain
 
