@@ -29,7 +29,7 @@ jobs:
         with:
           dockerfile: Dockerfile.distroless
       - name: ShellCheck
-        run: shellcheck healthcheck.sh tests/smoke.sh examples/*.sh examples/*/run-tests.sh .github/actions/aws-emulator/start-emulator.sh
+        run: shellcheck healthcheck.sh tests/smoke.sh examples/*.sh examples/*/run-tests.sh .github/actions/aws-emulator/start-emulator.sh scripts/check-registry-parity.sh
       - name: actionlint
         env:
           ACTIONLINT_VERSION: 1.7.12
