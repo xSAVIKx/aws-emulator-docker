@@ -3,7 +3,8 @@
 # Usage: tests/tls.sh <image>
 # A client container on the same Docker network calls the emulator by its
 # service name over HTTPS and over plain HTTP. The host calls it through the
-# published port. A restart must keep the same CA.
+# published port. A restart must keep the same CA. A second container uses
+# a CA from files (EMULATOR_TLS_CA_CERT and EMULATOR_TLS_CA_KEY).
 set -euo pipefail
 
 IMAGE="${1:?usage: $0 <image>}"
@@ -15,6 +16,8 @@ H="$WORK/home"
 D="$H/.aws/emulator/$PORT"
 NAME="aws-emulator-tls-$$"
 NET="aws-emulator-tls-$$"
+OWN="$NAME-own-ca"
+OWN_PORT=19299
 # With rootless Docker, container root maps to the host user.
 if docker info -f '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless; then
   USER_SPEC=0:0
@@ -23,7 +26,7 @@ else
 fi
 
 cleanup() {
-  docker rm -f "$NAME" >/dev/null 2>&1 || true
+  docker rm -f "$NAME" "$OWN" >/dev/null 2>&1 || true
   docker network rm "$NET" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -39,7 +42,7 @@ start() {
     -p "127.0.0.1:$PORT:$PORT" \
     --user "$USER_SPEC" \
     -e HOME="$H" -e EMULATOR_TELEMETRY=off -e EMULATOR_HEALTHCHECK_PORT="$PORT" \
-    -e EMULATOR_TLS_NAMES="aws,aws.test" -e EMULATOR_HTTP_PORT="$HTTP_PORT" \
+    -e EMULATOR_TLS_NAMES="aws,aws.test,*.svc.test" -e EMULATOR_HTTP_PORT="$HTTP_PORT" \
     -v "$H/.aws/emulator:$H/.aws/emulator" -v "$H/.aws/emulator-ca:$H/.aws/emulator-ca" \
     "$IMAGE" -p "$PORT" >/dev/null
   for _ in $(seq 90); do
@@ -58,7 +61,7 @@ client() {
 docker network create "$NET" >/dev/null
 mkdir -p "$H/.aws/emulator" "$H/.aws/emulator-ca"
 
-echo "== start with EMULATOR_TLS_NAMES=aws,aws.test and EMULATOR_HTTP_PORT=$HTTP_PORT"
+echo "== start with EMULATOR_TLS_NAMES=aws,aws.test,*.svc.test and EMULATOR_HTTP_PORT=$HTTP_PORT"
 start
 for f in emulator_credentials config ca.pem truststore.p12 tls-ca.pem; do
   [ -s "$D/$f" ] || fail "missing $D/$f"
@@ -101,6 +104,23 @@ if client -sf --cacert /run-dir/tls-ca.pem --resolve "other:$PORT:$(docker inspe
 fi
 echo "unknown name: rejected"
 
+ip=$(docker inspect -f "{{(index .NetworkSettings.Networks \"$NET\").IPAddress}}" "$NAME")
+
+echo "== container: a wildcard name (s3.svc.test for *.svc.test)"
+body=$(client -sf --cacert /run-dir/tls-ca.pem --resolve "s3.svc.test:$PORT:$ip" \
+  "https://s3.svc.test:$PORT/__admin/health") || fail "https://s3.svc.test health"
+[ "$body" = ok ] || fail "https://s3.svc.test health body: $body"
+if client -sf --cacert /run-dir/tls-ca.pem --resolve "a.b.svc.test:$PORT:$ip" \
+  "https://a.b.svc.test:$PORT/__admin/health" >/dev/null 2>&1; then
+  fail "the wildcard accepted two labels (a.b.svc.test)"
+fi
+echo "wildcard: OK"
+
+echo "== container: the container IP address $ip"
+body=$(client -sf --cacert /run-dir/tls-ca.pem "https://$ip:$PORT/__admin/health") || fail "https://$ip health"
+[ "$body" = ok ] || fail "https://$ip health body: $body"
+echo "IP address: OK"
+
 echo "== container: plain HTTP on http://aws:$HTTP_PORT"
 resp=$(client -sf "${sts[@]}" "http://aws:$HTTP_PORT/") || fail "plain HTTP STS call"
 echo "$resp" | grep -q 000000000000 || fail "plain HTTP STS response: $resp"
@@ -133,6 +153,40 @@ echo "CA key: OK"
 echo "== an invalid setting stops the container with a message"
 out=$(docker run --rm -e EMULATOR_TLS_NAMES='bad*name' "$IMAGE" 2>&1) && fail "a bad name was accepted"
 echo "$out" | grep -q 'is not a host name' || fail "unexpected message: $out"
+out=$(docker run --rm -e EMULATOR_TLS_CA_CERT=/x.pem "$IMAGE" 2>&1) && fail "a CA certificate without a key was accepted"
+echo "$out" | grep -q 'set both EMULATOR_TLS_CA_CERT and EMULATOR_TLS_CA_KEY' || fail "unexpected message: $out"
 echo "invalid setting: OK"
+
+echo "== a CA from files (EMULATOR_TLS_CA_CERT and EMULATOR_TLS_CA_KEY)"
+OWN_DIR="$WORK/own-ca"
+OWN_H="$WORK/own-home"
+OWN_D="$OWN_H/.aws/emulator/$OWN_PORT"
+mkdir -p "$OWN_DIR" "$OWN_H/.aws/emulator"
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 2 \
+  -subj "/CN=tls.sh test CA" \
+  -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" \
+  -keyout "$OWN_DIR/ca-key.pem" -out "$OWN_DIR/ca.pem" 2>/dev/null
+chmod 0644 "$OWN_DIR/ca-key.pem"
+docker run -d --name "$OWN" --network "$NET" --network-alias aws-own --memory=2g --memory-swap=2g \
+  --user "$USER_SPEC" \
+  -e HOME="$OWN_H" -e EMULATOR_TELEMETRY=off -e EMULATOR_HEALTHCHECK_PORT="$OWN_PORT" \
+  -e EMULATOR_TLS_NAMES=aws-own -e EMULATOR_TLS_CA_CERT=/ca/ca.pem -e EMULATOR_TLS_CA_KEY=/ca/ca-key.pem \
+  -v "$OWN_DIR:/ca:ro" -v "$OWN_H/.aws/emulator:$OWN_H/.aws/emulator" \
+  "$IMAGE" -p "$OWN_PORT" >/dev/null
+for _ in $(seq 90); do
+  [ -s "$OWN_D/tls-ca.pem" ] && break
+  docker inspect -f '{{.State.Running}}' "$OWN" 2>/dev/null | grep -q true || fail "the own-CA container stopped"
+  sleep 1
+done
+[ -s "$OWN_D/tls-ca.pem" ] || fail "the own-CA front end did not get ready"
+cmp -s "$OWN_D/tls-ca.pem" "$OWN_DIR/ca.pem" || fail "tls-ca.pem is not the CA from EMULATOR_TLS_CA_CERT"
+body=$(docker run --rm --network "$NET" --user "$USER_SPEC" -v "$OWN_DIR:/ca:ro" "$CURL_IMAGE" \
+  -sf --cacert /ca/ca.pem "https://aws-own:$OWN_PORT/__admin/health") || fail "https://aws-own health with the own CA"
+[ "$body" = ok ] || fail "https://aws-own health body: $body"
+if docker run --rm --network "$NET" --user "$USER_SPEC" -v "$D:/run-dir:ro" "$CURL_IMAGE" \
+  -sf --cacert /run-dir/tls-ca.pem "https://aws-own:$OWN_PORT/__admin/health" >/dev/null 2>&1; then
+  fail "the generated CA of the first container also verified the own-CA container"
+fi
+echo "own CA: OK"
 
 echo "PASS"
