@@ -10,7 +10,7 @@ This site uses the shared identity from xSAVIKx/xSAVIKx.github.io/identity.
 - Use system fonts only. Do not add a web font or serif headings.
 - New text colours must meet 4.5:1 contrast in light and dark.
 
-In this site, the vendored file is `site/ys-tokens.css`. The `:root` blocks in `site/index.html`
+In this site, the vendored file is `site/ys-plain.css` (the plain adapter). The `:root` blocks in `site/index.html`
 and `site/404.html` map `--bg`, `--bg-soft`, `--fg`, `--muted` and `--line` to the `--ys-*` neutrals.
 The orange accent (`--accent`, `--accent-text`, `--accent-ink`) and the code band (`--code-bg`,
 `--code-fg`) are the brand of this project. Keep them.
