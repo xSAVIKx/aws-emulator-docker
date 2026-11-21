@@ -1,0 +1,20 @@
+<Project>
+  <!-- Central package management: every package version is pinned here. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The library -->
+    <PackageVersion Include="Testcontainers" Version="4.17.0" />
+    <!-- AWS SDK for .NET v4 (tests only) -->
+    <PackageVersion Include="AWSSDK.SecurityToken" Version="4.1.0.2" />
+    <PackageVersion Include="AWSSDK.S3" Version="4.1.1" />
+    <PackageVersion Include="AWSSDK.SQS" Version="4.1.0.2" />
+    <!-- Test framework and runner -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
+    <!-- xunit.v3.mtp-off: xUnit v3 without Microsoft.Testing.Platform, so that
+         "dotnet test" uses VSTest and accepts the logger option. -->
+    <PackageVersion Include="xunit.v3.mtp-off" Version="4.0.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Testcontainers module for the AWS Emulator image.
+  The library depends on Testcontainers only. The tests use JUnit 5 and the
+  AWS SDK for Java 2.x. Run them with run-tests.sh.
+
+  Maintainer: Yurii Serhiichuk <yurii@serhiichuk.dev>
+  SPDX-License-Identifier: Apache-2.0
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>io.github.xsavikx</groupId>
+  <artifactId>testcontainers-aws-emulator</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>Testcontainers AWS Emulator</name>
+  <description>Testcontainers module for the AWS Emulator image with its TLS front end.</description>
+  <url>https://github.com/xSAVIKx/aws-emulator-docker</url>
+
+  <licenses>
+    <license>
+      <name>Apache-2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>Yurii Serhiichuk</name>
+      <email>yurii@serhiichuk.dev</email>
+    </developer>
+  </developers>
+
+  <scm>
+    <url>https://github.com/xSAVIKx/aws-emulator-docker</url>
+    <connection>scm:git:https://github.com/xSAVIKx/aws-emulator-docker.git</connection>
+  </scm>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Java 17 bytecode: the code runs on JDK 17 and later. -->
+    <maven.compiler.release>17</maven.compiler.release>
+
+    <testcontainers.version>2.0.5</testcontainers.version>
+    <aws.sdk.version>2.59.3</aws.sdk.version>
+    <junit.version>6.1.3</junit.version>
+    <assertj.version>3.27.7</assertj.version>
+    <!--
+      Testcontainers 2.0.5 brings slf4j-api 1.7.36. A slf4j-simple 2.x binding does not
+      bind to a 1.7 API, so the test binding uses the same 1.7 line.
+    -->
+    <slf4j.version>1.7.36</slf4j.version>
+
+    <clean.plugin.version>3.5.0</clean.plugin.version>
+    <resources.plugin.version>3.5.0</resources.plugin.version>
+    <compiler.plugin.version>3.16.0</compiler.plugin.version>
+    <surefire.plugin.version>3.6.1</surefire.plugin.version>
+    <jar.plugin.version>3.5.1</jar.plugin.version>
+    <install.plugin.version>3.2.0</install.plugin.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- The BOM keeps all AWS SDK modules on the same version. -->
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${aws.sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- The only compile dependency of the library. -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+      <version>${testcontainers.version}</version>
+    </dependency>
+
+    <!--
+      Test dependencies. Each service module brings the Apache 5 HTTP client
+      (synchronous) and the Netty client (asynchronous). The tests use synchronous
+      clients only, so the Netty client is excluded.
+    -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>sts</artifactId>
+      <scope>test</scope>
+      <exclusions><exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion></exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <scope>test</scope>
+      <exclusions><exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion></exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>sqs</artifactId>
+      <scope>test</scope>
+      <exclusions><exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion></exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>apache5-client</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>${assertj.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>${slf4j.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-clean-plugin</artifactId>
+        <version>${clean.plugin.version}</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>${resources.plugin.version}</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${compiler.plugin.version}</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${surefire.plugin.version}</version>
+        <configuration>
+          <!-- Show the test names and the reason for a failure in the console. -->
+          <trimStackTrace>false</trimStackTrace>
+          <reportFormat>plain</reportFormat>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>${jar.plugin.version}</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>${install.plugin.version}</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>

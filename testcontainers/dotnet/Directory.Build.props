@@ -1,0 +1,18 @@
+<Project>
+  <!-- Settings for all projects in this folder. -->
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Write packages.lock.json. In locked mode, a restore fails if a package
+         version does not match this lock file. run-tests.sh uses locked mode. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <Authors>Yurii Serhiichuk</Authors>
+    <Copyright>Yurii Serhiichuk</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/xSAVIKx/aws-emulator-docker</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/xSAVIKx/aws-emulator-docker</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>

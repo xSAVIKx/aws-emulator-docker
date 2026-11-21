@@ -1,0 +1,43 @@
+[project]
+name = "testcontainers-aws-emulator"
+version = "0.1.0"
+description = "Testcontainers module for the AWS Emulator Docker image"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Yurii Serhiichuk", email = "yurii@serhiichuk.dev" }]
+maintainers = [{ name = "Yurii Serhiichuk", email = "yurii@serhiichuk.dev" }]
+keywords = ["testcontainers", "aws", "emulator", "testing", "docker"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Testing",
+    "Framework :: Pytest",
+]
+dependencies = [
+    "testcontainers>=4.15.0,<5",
+    "typing-extensions>=4.0; python_version < \"3.11\"",
+]
+
+[project.urls]
+Homepage = "https://github.com/xSAVIKx/aws-emulator-docker"
+Repository = "https://github.com/xSAVIKx/aws-emulator-docker"
+Issues = "https://github.com/xSAVIKx/aws-emulator-docker/issues"
+
+[dependency-groups]
+dev = ["boto3==1.44.5", "pytest==9.2.0"]
+
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/testcontainers_aws_emulator"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"

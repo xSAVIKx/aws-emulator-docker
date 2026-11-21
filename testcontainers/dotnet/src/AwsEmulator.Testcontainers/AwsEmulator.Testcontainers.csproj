@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <!-- .NET 8 is out of support since 2026-11-10. The package still supports it,
+         because Testcontainers for .NET supports it. -->
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+    <RootNamespace>AwsEmulator.Testcontainers</RootNamespace>
+    <PackageId>AwsEmulator.Testcontainers</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Testcontainers for .NET module for the AWS Emulator Docker image, with the TLS front end.</Description>
+    <PackageTags>testcontainers;aws;emulator;testing</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Testcontainers" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AwsEmulator.Testcontainers.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>
