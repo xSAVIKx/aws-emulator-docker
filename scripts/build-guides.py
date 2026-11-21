@@ -198,7 +198,9 @@ def main():
     root = os.path.dirname(os.path.abspath(site.rstrip("/")))
     index = open(os.path.join(site, "index.html"), encoding="utf-8").read()
     style = re.search(r"<style>.*?</style>", index, re.S).group(0)
-    script = re.findall(r"<script>.*?</script>", index, re.S)[-1]
+    # The last inline script of index.html (the theme and copy buttons).
+    start = index.rindex("<script>")
+    script = index[start:index.index("</script>", start) + len("</script>")]
     theme_svg = re.search(r'<button class="icon-btn" id="theme"[^>]*>(<svg.*?</svg>)', index, re.S).group(1)
     github_svg = re.search(r'aria-label="Source on GitHub">(<svg.*?</svg>)', index, re.S).group(1)
     urls = []
