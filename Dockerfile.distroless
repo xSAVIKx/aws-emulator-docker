@@ -61,12 +61,19 @@ RUN set -eu; \
     chown -R "${EMULATOR_UID}:${EMULATOR_GID}" /home-skel/emulator
 
 # ---------------------------------------------------------------------------
-# Stage 2: a static health check program (no shell in the runtime image).
+# Stage 2: static programs: the health check (no shell in the runtime image)
+# and the entrypoint with the optional TLS front end.
 # ---------------------------------------------------------------------------
 FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS healthcheck
 ARG TARGETOS
 ARG TARGETARCH
-WORKDIR /src
+WORKDIR /src/entrypoint
+COPY entrypoint/go.mod entrypoint/go.sum ./
+RUN go mod download
+COPY entrypoint/ ./
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /aws-emulator-entrypoint .
+WORKDIR /src/healthcheck
 COPY healthcheck/ ./
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath -ldflags="-s -w" -o /aws-emulator-healthcheck .
@@ -93,6 +100,7 @@ LABEL org.opencontainers.image.title="AWS Emulator (distroless)" \
 COPY --from=fetch /out/opt/aws-emulator /opt/aws-emulator
 COPY --from=fetch --chown=${EMULATOR_UID}:${EMULATOR_GID} /home-skel/emulator /home/emulator
 COPY --from=healthcheck /aws-emulator-healthcheck /usr/local/bin/aws-emulator-healthcheck
+COPY --from=healthcheck /aws-emulator-entrypoint /usr/local/bin/aws-emulator-entrypoint
 
 USER ${EMULATOR_UID}:${EMULATOR_GID}
 ENV HOME=/home/emulator \
@@ -106,4 +114,4 @@ STOPSIGNAL SIGTERM
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
     CMD ["/usr/local/bin/aws-emulator-healthcheck"]
 
-ENTRYPOINT ["/opt/aws-emulator/bin/aws-emulator", "-b", "0.0.0.0"]
+ENTRYPOINT ["/usr/local/bin/aws-emulator-entrypoint"]

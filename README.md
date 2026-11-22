@@ -192,12 +192,92 @@ UID_GID="$(id -u):$(id -g)" docker compose up
 UID_GID=0:0 docker compose up
 ```
 
+## Call it from other containers
+
+The emulator certificate names only `localhost`, `127.0.0.1` and `::1`
+([aws/aws-emulator#23](https://github.com/aws/aws-emulator/issues/23)). A client in another
+container that calls `https://aws:9297` therefore fails TLS validation. The image has an
+optional TLS front end for this case. Set one of these variables to turn it on:
+
+| Variable | Effect |
+|---|---|
+| `EMULATOR_TLS_NAMES` | More names for the certificate, separated by commas: service names, host names, IP addresses, or wildcards such as `*.example.test`. |
+| `EMULATOR_TLS_CA_CERT`, `EMULATOR_TLS_CA_KEY` | Your own CA certificate and key (PEM files) to sign the certificate. |
+| `EMULATOR_HTTP_PORT` | A second port that accepts plain HTTP, for a private network. |
+
+With the front end, the emulator listens on `127.0.0.1` in the container. The front end
+listens on the same port on the other addresses of the container. It serves a certificate
+for these names:
+
+- `localhost`, `*.localhost`, `000000000000.localhost` (S3 Control), `127.0.0.1` and `::1`,
+- the container host name and its IP addresses,
+- the names in `EMULATOR_TLS_NAMES`.
+
+The front end passes each connection to the emulator without changes, so SigV4
+signatures, presigned URLs and queue URLs work as before. A CA signs the certificate. The
+front end makes the CA at the first start and keeps it in `~/.aws/emulator-ca/`. When you
+put that folder on a volume, the CA stays the same after a restart. The folder is not in
+`~/.aws/emulator/`, so clients that mount the run folder do not get the CA key.
+
+> [!CAUTION]
+> Do not add the CA to the trust store of an operating system or a browser. The CA can sign
+> a certificate for any name. Give it only to the test clients, for example with
+> `AWS_CA_BUNDLE`.
+
+In `~/.aws/emulator/<port>/`, the front end writes:
+
+- `tls-ca.pem`: the CA only. Give this file to clients in other containers.
+- `ca.pem` and `truststore.p12`: the CA and the emulator certificate. Clients on the host
+  can use these files as before.
+
+The Docker health check reports healthy only after the front end is ready.
+[`examples/compose/compose.yaml`](examples/compose/compose.yaml) is a complete example. CI
+tests the front end at each build with [`tests/tls.sh`](tests/tls.sh).
+
+```yaml
+services:
+  aws:
+    image: ghcr.io/xsavikx/aws-emulator:latest
+    environment:
+      EMULATOR_TLS_NAMES: aws
+    volumes:
+      - emulator:/home/emulator/.aws/emulator
+  tests:
+    image: public.ecr.aws/aws-cli/aws-cli:latest
+    depends_on:
+      aws: { condition: service_healthy }
+    environment:
+      AWS_ENDPOINT_URL: https://aws:9297
+      AWS_CA_BUNDLE: /emulator/9297/tls-ca.pem
+      AWS_SHARED_CREDENTIALS_FILE: /emulator/9297/emulator_credentials
+      AWS_REGION: us-east-1
+    volumes:
+      - emulator:/emulator:ro
+    command: ["sts", "get-caller-identity"]
+volumes:
+  emulator:
+```
+
+Limits of the front end:
+
+- Do not set `-b`, and do not use `-p 0`. The front end needs a fixed port.
+- Do not use it with `--network host`. Use a container network.
+- The front end listens on the addresses that the container has at the start. It does not
+  listen on a network that you connect later with `docker network connect`.
+- OpenSSL and curl do not accept `*.localhost` for `bucket.localhost`. Use path-style S3
+  addresses.
+- The emulator files belong to UID 1000. Run the client container as UID 1000 or as root,
+  or give the emulator the same user as the client.
+
 ## Examples and GitHub Action
 
 - [`examples/`](examples/) has integration tests in Python (pytest), TypeScript (Vitest),
   Java (JUnit 5), Go (`go test`), C# (xUnit) and Rust (`cargo test`). They cover STS, S3,
   DynamoDB, SQS, SNS to SQS and Secrets Manager. CI runs them on amd64 and arm64 every day
   and after each image release.
+- [`testcontainers/`](testcontainers/) has Testcontainers modules for Python, TypeScript,
+  Java, Go, .NET and Rust. A test starts its own emulator and gets the endpoint, the
+  credentials and a TLS helper. No volume and no fixed port are necessary.
 - The [Run AWS Emulator](https://github.com/marketplace/actions/run-aws-emulator) GitHub Action ([source](https://github.com/xSAVIKx/run-aws-emulator)) starts
   the emulator in your own workflow and sets the SDK environment:
 
@@ -229,14 +309,63 @@ UID_GID=0:0 docker compose up
   with your own UID, the emulator stops with `Permission denied (os error 13)`. With Podman,
   use `--userns=keep-id`.
 - **Other containers.** The emulator certificate names only `localhost`, `127.0.0.1` and
-  `::1`. A client in another container that calls `https://aws-emulator:9297` fails TLS
-  validation. Run the client in the network namespace of the emulator instead
-  (`docker run --network container:<emulator> ...` with `https://127.0.0.1:<port>`).
+  `::1`. To call the emulator by a service name, set `EMULATOR_TLS_NAMES`. See
+  [Call it from other containers](#call-it-from-other-containers).
 - **Use `127.0.0.1`, not `localhost`.** With a host name, some SDKs use virtual-hosted S3
   addresses such as `bucket.localhost`. These addresses do not resolve. The AWS SDK for
   JavaScript v3 is an example of such an SDK.
 - **No Windows containers.** The emulator runs only on Linux. On Windows, use Linux
   containers (Docker Desktop with WSL 2).
+
+### Known emulator limits
+
+These limits come from the upstream emulator, not from this image. The image runs the
+unchanged upstream package. The issues are open in
+[aws/aws-emulator](https://github.com/aws/aws-emulator/issues). This list states only what
+each issue reports. Check the issue for the current status.
+
+- **Cognito, TOTP-only MFA
+  ([#542](https://github.com/aws/aws-emulator/issues/542)).** A user pool with
+  `MfaConfiguration: "ON"` and only `SOFTWARE_TOKEN_MFA` fails to create in a CloudFormation
+  stack. The message asks for an SMS configuration. The issue reports that version 1.0.497-1
+  creates the pool, and that 1.0.498-1 and 1.0.500-1 do not.
+- **Lambda, `provided.al2023`
+  ([#539](https://github.com/aws/aws-emulator/issues/539)).** `CreateFunction` accepts the
+  runtime. `Invoke` fails with `InvalidRuntimeException`. The message says that the emulator
+  runs the Python and node runtimes.
+- **ALB to ECS target
+  ([#521](https://github.com/aws/aws-emulator/issues/521)).** The issue reports that
+  `DescribeTargetHealth` shows the target as healthy, but each request to the ALB listener
+  returns HTTP 502 with an empty body. It was reported on version 1.0.385.
+- **Process exit after bulk Lambda updates
+  ([#527](https://github.com/aws/aws-emulator/issues/527)).** The issue reports that the
+  emulator container exited after about 103 back-to-back `UpdateFunctionConfiguration`
+  calls with a new layer version. All state was lost. A run with a pause after each 10
+  functions did not exit. The cause is not confirmed in the issue.
+- **No official image
+  ([#14](https://github.com/aws/aws-emulator/issues/14)).** The issue asks AWS to publish an
+  official multi-arch container image. It is open. This project is an unofficial image.
+
+### Pin a version
+
+The `latest` tag moves to each new upstream release. If a release adds a regression, your
+tests can start to fail with no change in your code. To stay on one emulator version, use a
+version tag in place of `latest`:
+
+```sh
+docker pull ghcr.io/xsavikx/aws-emulator:1.0.322.1
+```
+
+- `<version>` (for example `1.0.322.1`) is the exact upstream package version. It moves
+  when this project rebuilds the image.
+- `<version>-<yyyymmdd>.<run>` is one build. It never moves.
+- A digest (`ghcr.io/xsavikx/aws-emulator@sha256:...`) never changes.
+- Add `-debian` or `-distroless` to the tag for those variants.
+
+See [Tags](#tags) for the full list. The [releases](https://github.com/xSAVIKx/aws-emulator-docker/releases)
+page lists each build and its digest. The version numbers in the upstream issues use a
+different form than the image tags. Look for the tag in the releases before you use it. The
+releases do not list each upstream version.
 
 ## Supply chain
 

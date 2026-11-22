@@ -7,15 +7,22 @@ set -euo pipefail
 
 IMAGE="${1:?usage: $0 <image>}"
 PORT="${PORT:-19297}"
-WORK="$(mktemp -d)"
+WORK="${WORK:-$(mktemp -d)}"
 H="$WORK/home"
 D="$H/.aws/emulator/$PORT"
 NAME="aws-emulator-smoke-$$"
+# With rootless Docker, container root maps to the host user.
+if docker info -f '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless; then
+  USER_SPEC=0:0
+else
+  USER_SPEC="$(id -u):$(id -g)"
+fi
 
 cleanup() {
   docker logs "$NAME" >"$WORK/container.log" 2>&1 || true
   docker rm -f "$NAME" >/dev/null 2>&1 || true
   docker rm -f "$NAME-default" >/dev/null 2>&1 || true
+  docker rm -f "$NAME-badport" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -32,7 +39,7 @@ echo "== start with bind mount on port $PORT"
 mkdir -p "$H/.aws/emulator"
 docker run -d --name "$NAME" --memory=2g --memory-swap=2g \
   -p "127.0.0.1:$PORT:$PORT" \
-  --user "$(id -u):$(id -g)" \
+  --user "$USER_SPEC" \
   -e HOME="$H" -e EMULATOR_TELEMETRY=off -e EMULATOR_HEALTHCHECK_PORT="$PORT" \
   -v "$H/.aws/emulator:$H/.aws/emulator" \
   "$IMAGE" -p "$PORT" >/dev/null
@@ -96,5 +103,23 @@ for _ in $(seq 30); do
 done
 [ "$status" = "healthy" ] || fail "default container health is $status"
 echo "default: $status"
+
+# The health check must fail when it calls a port where nothing listens.
+# The short health options make the test fast. The check command stays the
+# one from the image.
+echo "== HEALTHCHECK reports unhealthy for a wrong port"
+docker run -d --name "$NAME-badport" -e EMULATOR_TELEMETRY=off \
+  -e EMULATOR_HEALTHCHECK_PORT=1 \
+  --health-interval=2s --health-timeout=5s --health-start-period=0s --health-retries=2 \
+  "$IMAGE" >/dev/null
+for _ in $(seq 30); do
+  status=$(docker inspect -f '{{.State.Health.Status}}' "$NAME-badport")
+  [ "$status" = "unhealthy" ] && break
+  sleep 2
+done
+[ "$status" = "unhealthy" ] || fail "health with a wrong port is $status, expected unhealthy"
+running=$(docker inspect -f '{{.State.Running}}' "$NAME-badport")
+[ "$running" = "true" ] || fail "the emulator stopped, so the result does not prove the check"
+echo "wrong port: $status"
 
 echo "PASS"

@@ -1,0 +1,39 @@
+# Call the emulator by its service name from another container.
+# Usage: docker compose up --abort-on-container-exit --exit-code-from tests
+#
+# EMULATOR_TLS_NAMES adds "aws" to the certificate. The emulator files are in
+# the named volume "emulator", and the tests container mounts it read-only.
+# The files belong to UID 1000, so the client runs as UID 1000 or as root.
+services:
+  aws:
+    image: ${IMAGE:-ghcr.io/xsavikx/aws-emulator:latest}
+    environment:
+      EMULATOR_TLS_NAMES: aws
+      EMULATOR_TELEMETRY: "off"
+    volumes:
+      - emulator:/home/emulator/.aws/emulator
+    mem_limit: 2g
+
+  tests:
+    image: public.ecr.aws/aws-cli/aws-cli:latest
+    depends_on:
+      aws:
+        condition: service_healthy
+    environment:
+      AWS_ENDPOINT_URL: https://aws:9297
+      AWS_CA_BUNDLE: /emulator/9297/tls-ca.pem
+      AWS_SHARED_CREDENTIALS_FILE: /emulator/9297/emulator_credentials
+      AWS_CONFIG_FILE: /emulator/9297/config
+      AWS_REGION: us-east-1
+    volumes:
+      - emulator:/emulator:ro
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        aws sts get-caller-identity
+        aws s3 mb s3://compose-bucket
+        echo hello | aws s3 cp - s3://compose-bucket/hello.txt
+        aws s3 cp s3://compose-bucket/hello.txt -
+
+volumes:
+  emulator:

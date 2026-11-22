@@ -1,0 +1,32 @@
+[package]
+name = "testcontainers-aws-emulator"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+authors = ["Yurii Serhiichuk <yurii@serhiichuk.dev>"]
+repository = "https://github.com/xSAVIKx/aws-emulator-docker"
+description = "Testcontainers module for the AWS Emulator image"
+readme = "README.md"
+keywords = ["testcontainers", "aws", "emulator", "testing", "docker"]
+categories = ["development-tools::testing"]
+
+[dependencies]
+testcontainers = "0.28.0"
+tempfile = "3.27.0"
+# Optional: `StartedAwsEmulator::rustls_root_store`.
+rustls = { version = "0.23.46", default-features = false, features = ["std"], optional = true }
+rustls-pki-types = { version = "1.16.0", features = ["std"], optional = true }
+
+[features]
+default = []
+# Adds `StartedAwsEmulator::rustls_root_store`, a rustls root store with only the CA.
+rustls = ["dep:rustls", "dep:rustls-pki-types"]
+
+[dev-dependencies]
+aws-config = { version = "1.13.3", default-features = false, features = ["behavior-version-latest", "rt-tokio"] }
+aws-smithy-http-client = { version = "1.5.3", features = ["rustls-aws-lc"] }
+aws-sdk-s3 = { version = "1.160.0", default-features = false, features = ["rt-tokio"] }
+aws-sdk-sqs = { version = "1.122.0", default-features = false, features = ["rt-tokio"] }
+aws-sdk-sts = { version = "1.127.0", default-features = false, features = ["rt-tokio"] }
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread"] }

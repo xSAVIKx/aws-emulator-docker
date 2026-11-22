@@ -43,7 +43,7 @@ aws sts get-caller-identity   # Account 000000000000
 - Rootless Docker: use `--user 0:0`. Podman: `--userns=keep-id`.
 - Use 127.0.0.1, not localhost, and path-style S3 addresses.
 - AWS SDK for JavaScript v3: set `useQueueUrlAsEndpoint: false` on SQSClient, or SQS requests go to real AWS.
-- Other containers cannot reach the emulator by service name: the certificate names only localhost, 127.0.0.1 and ::1.
+- Other containers: the emulator certificate names only localhost, 127.0.0.1 and ::1. Set `EMULATOR_TLS_NAMES=aws` to add a service name; the image then serves a certificate from its own CA and writes the CA to `~/.aws/emulator/<port>/tls-ca.pem`. `EMULATOR_HTTP_PORT` adds a plain HTTP port. See https://github.com/xSAVIKx/aws-emulator-docker#call-it-from-other-containers.
 - All state is in memory. Give the container 2 GiB.
 - Image size (linux/amd64, uncompressed): about 1.49 GB (Amazon Linux), 1.48 GB (Debian), 1.39 GB (distroless). The image from the Dockerfile in the AWS guide is about 1.86 GB.
 - The signatures prove where the binary and the image come from. They do not prove that the emulator code is free of defects. Use it for tests only, without real AWS credentials.
@@ -57,6 +57,12 @@ aws sts get-caller-identity   # Account 000000000000
 
 - [Full documentation in one file](https://xsavikx.github.io/aws-emulator-docker/llms-full.txt): the image README, the examples README, the action README, the FAQ and the latest release notes
 - [Website](https://xsavikx.github.io/aws-emulator-docker/): quick start, facts, examples, action, tags, verification, FAQ, release notes
+- [Python guide](https://xsavikx.github.io/aws-emulator-docker/guides/python/): pytest and Boto3, Testcontainers module
+- [TypeScript guide](https://xsavikx.github.io/aws-emulator-docker/guides/typescript/): Vitest and the AWS SDK for JavaScript v3, Testcontainers module
+- [Java guide](https://xsavikx.github.io/aws-emulator-docker/guides/java/): JUnit 5 and the AWS SDK for Java 2.x, Testcontainers module
+- [Go guide](https://xsavikx.github.io/aws-emulator-docker/guides/go/): go test and the AWS SDK for Go v2, Testcontainers module
+- [C# and .NET guide](https://xsavikx.github.io/aws-emulator-docker/guides/dotnet/): xUnit and the AWS SDK for .NET, Testcontainers module
+- [Rust guide](https://xsavikx.github.io/aws-emulator-docker/guides/rust/): cargo test and the AWS SDK for Rust, Testcontainers module
 - [Source repository](https://github.com/xSAVIKx/aws-emulator-docker): Dockerfiles, CI, tests
 - [Examples](https://github.com/xSAVIKx/aws-emulator-docker/tree/main/examples): Python pytest, TypeScript Vitest, Java JUnit 5, Go, C# xUnit, Rust
 - [Running AWS Emulator in Docker, on any arch, in CI](https://serhiichuk.dev/blog/aws-emulator-container-image/): blog post about docker run, Compose, GitHub Actions and known problems

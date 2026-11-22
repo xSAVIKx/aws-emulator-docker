@@ -15,6 +15,10 @@ updates:
     directory: /healthcheck
     schedule:
       interval: weekly
+  - package-ecosystem: gomod
+    directory: /entrypoint
+    schedule:
+      interval: weekly
 
   # The examples. One grouped pull request for each language and week.
   - package-ecosystem: uv
@@ -63,3 +67,51 @@ updates:
     groups:
       rust:
         patterns: ["*"]
+
+  # The Testcontainers modules. One grouped pull request for each module and week.
+  - package-ecosystem: uv
+    directory: /testcontainers/python
+    schedule:
+      interval: weekly
+    groups:
+      testcontainers-python:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /testcontainers/typescript
+    schedule:
+      interval: weekly
+    groups:
+      testcontainers-typescript:
+        patterns: ["*"]
+  - package-ecosystem: maven
+    directory: /testcontainers/java
+    schedule:
+      interval: weekly
+    groups:
+      testcontainers-java:
+        patterns: ["*"]
+  - package-ecosystem: gomod
+    directory: /testcontainers/go
+    schedule:
+      interval: weekly
+    groups:
+      testcontainers-go:
+        patterns: ["*"]
+  - package-ecosystem: nuget
+    directory: /testcontainers/dotnet
+    schedule:
+      interval: weekly
+    groups:
+      testcontainers-dotnet:
+        patterns: ["*"]
+  - package-ecosystem: cargo
+    directory: /testcontainers/rust
+    schedule:
+      interval: weekly
+    groups:
+      testcontainers-rust:
+        patterns: ["*"]
+  - package-ecosystem: dotnet-sdk
+    directory: /testcontainers/dotnet
+    schedule:
+      interval: weekly
