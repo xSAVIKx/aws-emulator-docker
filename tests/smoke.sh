@@ -22,6 +22,7 @@ cleanup() {
   docker logs "$NAME" >"$WORK/container.log" 2>&1 || true
   docker rm -f "$NAME" >/dev/null 2>&1 || true
   docker rm -f "$NAME-default" >/dev/null 2>&1 || true
+  docker rm -f "$NAME-badport" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -102,5 +103,23 @@ for _ in $(seq 30); do
 done
 [ "$status" = "healthy" ] || fail "default container health is $status"
 echo "default: $status"
+
+# The health check must fail when it calls a port where nothing listens.
+# The short health options make the test fast. The check command stays the
+# one from the image.
+echo "== HEALTHCHECK reports unhealthy for a wrong port"
+docker run -d --name "$NAME-badport" -e EMULATOR_TELEMETRY=off \
+  -e EMULATOR_HEALTHCHECK_PORT=1 \
+  --health-interval=2s --health-timeout=5s --health-start-period=0s --health-retries=2 \
+  "$IMAGE" >/dev/null
+for _ in $(seq 30); do
+  status=$(docker inspect -f '{{.State.Health.Status}}' "$NAME-badport")
+  [ "$status" = "unhealthy" ] && break
+  sleep 2
+done
+[ "$status" = "unhealthy" ] || fail "health with a wrong port is $status, expected unhealthy"
+running=$(docker inspect -f '{{.State.Running}}' "$NAME-badport")
+[ "$running" = "true" ] || fail "the emulator stopped, so the result does not prove the check"
+echo "wrong port: $status"
 
 echo "PASS"

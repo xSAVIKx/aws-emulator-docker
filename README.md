@@ -317,6 +317,56 @@ Limits of the front end:
 - **No Windows containers.** The emulator runs only on Linux. On Windows, use Linux
   containers (Docker Desktop with WSL 2).
 
+### Known emulator limits
+
+These limits come from the upstream emulator, not from this image. The image runs the
+unchanged upstream package. The issues are open in
+[aws/aws-emulator](https://github.com/aws/aws-emulator/issues). This list states only what
+each issue reports. Check the issue for the current status.
+
+- **Cognito, TOTP-only MFA
+  ([#542](https://github.com/aws/aws-emulator/issues/542)).** A user pool with
+  `MfaConfiguration: "ON"` and only `SOFTWARE_TOKEN_MFA` fails to create in a CloudFormation
+  stack. The message asks for an SMS configuration. The issue reports that version 1.0.497-1
+  creates the pool, and that 1.0.498-1 and 1.0.500-1 do not.
+- **Lambda, `provided.al2023`
+  ([#539](https://github.com/aws/aws-emulator/issues/539)).** `CreateFunction` accepts the
+  runtime. `Invoke` fails with `InvalidRuntimeException`. The message says that the emulator
+  runs the Python and node runtimes.
+- **ALB to ECS target
+  ([#521](https://github.com/aws/aws-emulator/issues/521)).** The issue reports that
+  `DescribeTargetHealth` shows the target as healthy, but each request to the ALB listener
+  returns HTTP 502 with an empty body. It was reported on version 1.0.385.
+- **Process exit after bulk Lambda updates
+  ([#527](https://github.com/aws/aws-emulator/issues/527)).** The issue reports that the
+  emulator container exited after about 103 back-to-back `UpdateFunctionConfiguration`
+  calls with a new layer version. All state was lost. A run with a pause after each 10
+  functions did not exit. The cause is not confirmed in the issue.
+- **No official image
+  ([#14](https://github.com/aws/aws-emulator/issues/14)).** The issue asks AWS to publish an
+  official multi-arch container image. It is open. This project is an unofficial image.
+
+### Pin a version
+
+The `latest` tag moves to each new upstream release. If a release adds a regression, your
+tests can start to fail with no change in your code. To stay on one emulator version, use a
+version tag in place of `latest`:
+
+```sh
+docker pull ghcr.io/xsavikx/aws-emulator:1.0.322.1
+```
+
+- `<version>` (for example `1.0.322.1`) is the exact upstream package version. It moves
+  when this project rebuilds the image.
+- `<version>-<yyyymmdd>.<run>` is one build. It never moves.
+- A digest (`ghcr.io/xsavikx/aws-emulator@sha256:...`) never changes.
+- Add `-debian` or `-distroless` to the tag for those variants.
+
+See [Tags](#tags) for the full list. The [releases](https://github.com/xSAVIKx/aws-emulator-docker/releases)
+page lists each build and its digest. The version numbers in the upstream issues use a
+different form than the image tags. Look for the tag in the releases before you use it. The
+releases do not list each upstream version.
+
 ## Supply chain
 
 Every published image has:

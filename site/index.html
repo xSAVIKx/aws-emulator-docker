@@ -8,7 +8,7 @@
 <meta name="author" content="Yurii Serhiichuk">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#ff9f1c" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <meta property="og:site_name" content="AWS Emulator Docker Image">
 <meta property="og:locale" content="en_US">
@@ -257,24 +257,26 @@
 }
 </script>
 <style>
+/* Shared identity (slate neutrals, system fonts). The absolute path also works for 404.html and pages in sub-folders. */
+@import url("/aws-emulator-docker/ys-plain.css");
 :root{
-  --bg:#ffffff;--bg-soft:#f5f7fa;--fg:#141a22;--muted:#5a6573;--line:#e3e8ef;
+  --bg:var(--ys-bg,#f8fafc);--bg-soft:var(--ys-surface,#ffffff);--fg:var(--ys-text,#0f172a);--muted:var(--ys-muted,#475569);--line:var(--ys-border,#e2e8f0);
   --accent:#e68a00;--accent-text:#a85600;--accent-ink:#141a22;--code-bg:#0f1720;--code-fg:#e6edf3;--ok:#1a7f37;
   --radius:12px;--max:980px;
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
-    --bg:#0d1117;--bg-soft:#151b23;--fg:#e6edf3;--muted:#9aa6b2;--line:#262f3a;
+    --bg:var(--ys-bg,#14161a);--bg-soft:var(--ys-surface,#1b1e24);--fg:var(--ys-text,#e8e8e8);--muted:var(--ys-muted,#a7adb8);--line:var(--ys-border,#2a2d33);
     --accent:#ff9f1c;--accent-text:#ff9f1c;--accent-ink:#0d1117;--code-bg:#010409;--code-fg:#e6edf3;--ok:#3fb950;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0d1117;--bg-soft:#151b23;--fg:#e6edf3;--muted:#9aa6b2;--line:#262f3a;
+  --bg:var(--ys-bg,#14161a);--bg-soft:var(--ys-surface,#1b1e24);--fg:var(--ys-text,#e8e8e8);--muted:var(--ys-muted,#a7adb8);--line:var(--ys-border,#2a2d33);
   --accent:#ff9f1c;--accent-text:#ff9f1c;--accent-ink:#0d1117;--code-bg:#010409;--code-fg:#e6edf3;--ok:#3fb950;
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 var(--ys-font-sans,ui-sans-serif,system-ui,sans-serif)}
 a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:3px}
 .wrap{max-width:var(--max);margin:0 auto;padding:0 16px}
 header.top{position:sticky;top:0;z-index:20;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 88%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(10px);backdrop-filter:saturate(1.4) blur(10px)}
@@ -294,7 +296,7 @@ nav.sections a[aria-current="true"]{color:var(--accent-ink);background:var(--acc
 .skip{position:absolute;left:12px;top:-60px;z-index:50;background:var(--accent);color:var(--accent-ink);padding:10px 14px;border-radius:10px;font-weight:700;text-decoration:none}
 .skip:focus{top:10px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+:focus-visible{outline:3px solid var(--accent-text);outline-offset:2px;border-radius:6px}
 html{scroll-padding-top:116px}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -311,8 +313,8 @@ h2{font-size:26px;margin:56px 0 12px;letter-spacing:-.01em}
 h3{font-size:18px;margin:24px 0 8px}
 p{margin:0 0 14px}
 .muted{color:var(--muted)}
-pre{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:var(--radius);padding:40px 18px 16px;overflow-x:auto;font:13.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;margin:0 0 16px}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+pre{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:var(--radius);padding:40px 18px 16px;overflow-x:auto;font:13.5px/1.55 var(--ys-font-mono,ui-monospace,monospace);margin:0 0 16px}
+code{font-family:var(--ys-font-mono,ui-monospace,monospace);font-size:.92em}
 :not(pre)>code{background:var(--bg-soft);border:1px solid var(--line);border-radius:6px;padding:1px 5px;overflow-wrap:anywhere}
 .copy{position:absolute;top:8px;right:8px;background:transparent;color:var(--code-fg);border:1px solid #3a4552;border-radius:8px;font-size:12px;padding:3px 9px;cursor:pointer;opacity:.85}
 .copy:hover{opacity:1;border-color:var(--accent)}
@@ -708,7 +710,7 @@ let sqs = aws_sdk_sqs::Client::new(&amp;config);</code><button class="copy" type
   Created and maintained by <a href="https://serhiichuk.dev">Yurii Serhiichuk</a> (<a href="https://github.com/xSAVIKx">@xSAVIKx</a>).
   Source: <a href="https://github.com/xSAVIKx/aws-emulator-docker">xSAVIKx/aws-emulator-docker</a>.
   Upstream: <a href="https://github.com/aws/aws-emulator">aws/aws-emulator</a>.
-  <a href="https://xsavikx.github.io/">More projects</a>.
+  <a class="ys-back-link" href="https://xsavikx.github.io/">More projects</a>
 </div></footer>
 
 <a class="icon-btn to-top" href="#top" aria-label="Back to top"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></a>

@@ -182,7 +182,7 @@ def page(lang, name, framework, sdk, tc_name, body, has_tc, style, script, theme
   Created and maintained by <a href="https://serhiichuk.dev">Yurii Serhiichuk</a> (<a href="https://github.com/xSAVIKx">@xSAVIKx</a>).
   Source: <a href="https://github.com/xSAVIKx/aws-emulator-docker">xSAVIKx/aws-emulator-docker</a>.
   Upstream: <a href="https://github.com/aws/aws-emulator">aws/aws-emulator</a>.
-  <a href="https://xsavikx.github.io/">More projects</a>.
+  <a class="ys-back-link" href="https://xsavikx.github.io/">More projects</a>
 </div></footer>
 
 <a class="icon-btn to-top" href="#top" aria-label="Back to top"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></a>
