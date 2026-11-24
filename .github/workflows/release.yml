@@ -588,6 +588,15 @@ jobs:
       image: ghcr.io/xsavikx/aws-emulator:${{ needs.resolve.outputs.upstream_version }}
       full: true
 
+  example-python:
+    name: Python example with the new image
+    needs: [resolve, publish]
+    if: needs.resolve.outputs.publish == 'true'
+    uses: ./.github/workflows/example-python.yml
+    with:
+      image: ghcr.io/xsavikx/aws-emulator:${{ needs.resolve.outputs.upstream_version }}
+      full: true
+
   pages:
     name: Update the website
     needs: [resolve, release]

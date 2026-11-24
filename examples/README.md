@@ -85,6 +85,10 @@ steps:
   - run: aws sts get-caller-identity   # and then your own tests
 ```
 
+For a complete workflow for one language, see
+[`example-python.yml`](../.github/workflows/example-python.yml). It runs the Python tests
+in this folder.
+
 The action is [Run AWS Emulator](https://github.com/marketplace/actions/run-aws-emulator) on the GitHub Marketplace
 ([source](https://github.com/xSAVIKx/run-aws-emulator)).
 Pin the image to a build tag or a digest for reproducible runs.

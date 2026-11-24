@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - "examples/**"
+      - "!examples/python/**"
       - ".github/actions/aws-emulator/**"
       - ".github/workflows/examples.yml"
   pull_request:
     paths:
       - "examples/**"
+      - "!examples/python/**"
       - ".github/actions/aws-emulator/**"
       - ".github/workflows/examples.yml"
   # The release workflow calls this workflow after each publish.
@@ -49,7 +51,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lang: [python, typescript, java, go, dotnet, rust]
+        # Python has its own workflow: example-python.yml.
+        lang: [typescript, java, go, dotnet, rust]
         # Push and pull request runs use one Ubuntu version. Scheduled, manual and
         # post-publish runs use all supported versions.
         os: ${{ fromJSON((inputs.full || github.event_name == 'schedule') && '["ubuntu-24.04","ubuntu-26.04"]' || '["ubuntu-24.04"]') }}
@@ -61,8 +64,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - if: matrix.lang == 'python'
-        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       - if: matrix.lang == 'typescript'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
