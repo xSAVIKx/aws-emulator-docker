@@ -42,7 +42,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  # A fixed prefix, not github.workflow. In a call from release.yml, github.workflow is
+  # the name of the caller, so two called workflows got the same group and cancelled each other.
+  # inputs.image keeps a call from release.yml apart from a push run of the same workflow.
+  group: examples-${{ github.ref }}-${{ github.event_name }}-${{ inputs.image }}
   cancel-in-progress: true
 
 jobs:
