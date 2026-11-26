@@ -399,7 +399,7 @@ cosign verify ghcr.io/xsavikx/aws-emulator:latest \
 Without a local cosign installation, run cosign as a container:
 
 ```sh
-docker run --rm ghcr.io/sigstore/cosign/cosign:v3.1.4 verify ghcr.io/xsavikx/aws-emulator:latest \
+docker run --rm ghcr.io/sigstore/cosign/cosign:v3.1.6 verify ghcr.io/xsavikx/aws-emulator:latest \
   --certificate-identity 'https://github.com/xSAVIKx/aws-emulator-docker/.github/workflows/release.yml@refs/heads/main' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
