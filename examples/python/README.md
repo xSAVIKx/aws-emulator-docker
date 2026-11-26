@@ -23,6 +23,24 @@ The script starts a fresh emulator, runs the tests, and stops the emulator.
 `run-tests.sh` runs `uv run --locked pytest -v`. Extra arguments go to pytest, for
 example `examples/python/run-tests.sh -k queue`.
 
+## Run the tests in GitHub Actions
+
+[`.github/workflows/example-python.yml`](../../.github/workflows/example-python.yml) runs
+these tests in GitHub Actions. To use it in your own repository, copy its `test` job. The
+job has three steps after the checkout:
+
+```yaml
+steps:
+  - uses: actions/checkout@v7
+  - uses: astral-sh/setup-uv@v10
+  - uses: xSAVIKx/run-aws-emulator@v1
+  - run: uv run --locked pytest -v
+```
+
+The action starts the emulator and sets `AWS_ENDPOINT_URL`, the credentials, the Region
+and the CA bundle. Boto3 reads them from the environment, so the tests need no changes
+for CI. To run only the S3 test, add `-k object_storage` to the pytest command.
+
 ## Files
 
 | File | Purpose |

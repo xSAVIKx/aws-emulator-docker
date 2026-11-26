@@ -1,0 +1,88 @@
+# Python example: pytest + Boto3 tests against the AWS Emulator in GitHub Actions.
+#
+# Copy the "test" job into your own workflow. It needs only three steps:
+#   1. Set up Python (here: uv).
+#   2. Start the emulator with xSAVIKx/run-aws-emulator. The action sets
+#      AWS_ENDPOINT_URL, the credentials, the region and the CA bundle.
+#   3. Run your tests. Boto3 reads the settings from the environment, so the
+#      tests contain no endpoint, keys or certificate paths.
+# The tests are in examples/python/tests. The S3 test is test_object_storage.py.
+name: Example (Python)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "examples/python/**"
+      - ".github/workflows/example-python.yml"
+  pull_request:
+    paths:
+      - "examples/python/**"
+      - ".github/workflows/example-python.yml"
+  # The release workflow calls this workflow after each publish.
+  workflow_call:
+    inputs:
+      image:
+        description: Image to test
+        type: string
+        required: true
+      full:
+        description: Run on all Ubuntu versions
+        type: boolean
+        default: true
+  schedule:
+    - cron: "43 5 * * *"
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Image to test
+        default: ghcr.io/xsavikx/aws-emulator:latest
+        type: string
+      full:
+        description: Run on all Ubuntu versions
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: python on ${{ matrix.os }}${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Push and pull request runs use one Ubuntu version. Scheduled, manual and
+        # post-publish runs use all supported versions. Your own workflow needs
+        # only one runner, for example "runs-on: ubuntu-24.04".
+        os: ${{ fromJSON((inputs.full || github.event_name == 'schedule') && '["ubuntu-24.04","ubuntu-26.04"]' || '["ubuntu-24.04"]') }}
+        arch: ["", "-arm"]
+    runs-on: ${{ matrix.os }}${{ matrix.arch }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+
+      - name: Run AWS Emulator
+        id: emulator
+        uses: xSAVIKx/run-aws-emulator@f26496537177fd799f424012f533862a6569d1bd # v1.1.1
+        with:
+          # In your own workflow, pin a build tag or a digest, for example
+          # ghcr.io/xsavikx/aws-emulator:1.0.587.1
+          image: ${{ inputs.image || 'ghcr.io/xsavikx/aws-emulator:latest' }}
+
+      - name: Run the Python tests
+        run: examples/python/run-tests.sh
+
+      - name: Emulator logs
+        if: failure()
+        env:
+          CONTAINER: ${{ steps.emulator.outputs.container }}
+        run: docker logs "$CONTAINER"
