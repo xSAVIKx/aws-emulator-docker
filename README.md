@@ -260,7 +260,9 @@ volumes:
 
 Limits of the front end:
 
-- Do not set `-b`, and do not use `-p 0`. The front end needs a fixed port.
+- Do not set `-b` to a specific address, and do not use `-p 0`. The front end needs a fixed port.
+  The front end ignores `-b 0.0.0.0` and `-b ::`, so the Testcontainers modules for Go and .NET
+  can use it.
 - Do not use it with `--network host`. Use a container network.
 - The front end listens on the addresses that the container has at the start. It does not
   listen on a network that you connect later with `docker network connect`.

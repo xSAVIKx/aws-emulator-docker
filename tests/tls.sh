@@ -4,7 +4,8 @@
 # A client container on the same Docker network calls the emulator by its
 # service name over HTTPS and over plain HTTP. The host calls it through the
 # published port. A restart must keep the same CA. A second container uses
-# a CA from files (EMULATOR_TLS_CA_CERT and EMULATOR_TLS_CA_KEY).
+# a CA from files (EMULATOR_TLS_CA_CERT and EMULATOR_TLS_CA_KEY). It also gets
+# "--bind 0.0.0.0", as from the Testcontainers modules for Go and .NET.
 set -euo pipefail
 
 IMAGE="${1:?usage: $0 <image>}"
@@ -172,7 +173,7 @@ docker run -d --name "$OWN" --network "$NET" --network-alias aws-own --memory=2g
   -e HOME="$OWN_H" -e EMULATOR_TELEMETRY=off -e EMULATOR_HEALTHCHECK_PORT="$OWN_PORT" \
   -e EMULATOR_TLS_NAMES=aws-own -e EMULATOR_TLS_CA_CERT=/ca/ca.pem -e EMULATOR_TLS_CA_KEY=/ca/ca-key.pem \
   -v "$OWN_DIR:/ca:ro" -v "$OWN_H/.aws/emulator:$OWN_H/.aws/emulator" \
-  "$IMAGE" -p "$OWN_PORT" >/dev/null
+  "$IMAGE" --bind 0.0.0.0 --port "$OWN_PORT" >/dev/null
 for _ in $(seq 90); do
   [ -s "$OWN_D/tls-ca.pem" ] && break
   docker inspect -f '{{.State.Running}}' "$OWN" 2>/dev/null | grep -q true || fail "the own-CA container stopped"
@@ -188,5 +189,11 @@ if docker run --rm --network "$NET" --user "$USER_SPEC" -v "$D:/run-dir:ro" "$CU
   fail "the generated CA of the first container also verified the own-CA container"
 fi
 echo "own CA: OK"
+echo "(the own-CA container also used --bind 0.0.0.0, as the Testcontainers modules do: OK)"
+
+echo "== a bind address that is not a wildcard address stops the container"
+out=$(docker run --rm -e EMULATOR_TLS_NAMES=aws "$IMAGE" -b 10.0.0.1 2>&1) && fail "a bind address was accepted"
+echo "$out" | grep -q 'do not set the bind address' || fail "unexpected message: $out"
+echo "bind address: OK"
 
 echo "PASS"

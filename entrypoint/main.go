@@ -89,7 +89,7 @@ func run(args []string) int {
 		logf("cannot find the home folder: %v", err)
 		return 2
 	}
-	return runFrontEnd(bin, args, cfg, port, home)
+	return runFrontEnd(bin, parsed.rest, cfg, port, home)
 }
 
 func findEmulator() (string, error) {
@@ -161,8 +161,14 @@ type args struct {
 	info    bool   // -h, --help, -v or --version
 	port    string // the last port value, "" when not given
 	hasPort bool
-	hasBind bool
+	hasBind bool     // a bind address that is not a wildcard address
+	rest    []string // the arguments without wildcard bind options
 }
+
+// wildcardBind holds the bind addresses that mean "all addresses". The front
+// end already listens on all addresses, so it removes these bind options.
+// Testcontainers modules send "--bind 0.0.0.0".
+var wildcardBind = map[string]bool{"0.0.0.0": true, "::": true, "[::]": true}
 
 // valueFlags are the emulator options that take a value (see "aws-emulator --help").
 var valueFlags = map[string]bool{
@@ -177,9 +183,12 @@ func parseArgs(list []string) (args, error) {
 	for i := 0; i < len(list); i++ {
 		arg := list[i]
 		if arg == "--" {
+			a.rest = append(a.rest, list[i:]...)
 			break
 		}
+		start := i
 		if !strings.HasPrefix(arg, "-") || arg == "-" {
+			a.rest = append(a.rest, arg)
 			continue
 		}
 		name, value, inline := arg, "", false
@@ -195,9 +204,11 @@ func parseArgs(list []string) (args, error) {
 			if !inline {
 				a.info = true
 			}
+			a.rest = append(a.rest, arg)
 			continue
 		}
 		if !valueFlags[name] {
+			a.rest = append(a.rest, arg)
 			continue
 		}
 		if !inline {
@@ -211,14 +222,18 @@ func parseArgs(list []string) (args, error) {
 		case "-p", "--port":
 			a.port, a.hasPort = value, true
 		case "-b", "--bind":
+			if wildcardBind[value] {
+				continue
+			}
 			a.hasBind = true
 		}
+		a.rest = append(a.rest, list[start:i+1]...)
 	}
 	return a, nil
 }
 
-// frontEndPort returns the emulator port. It refuses a bind address and
-// port 0, because the front end needs both to be fixed.
+// frontEndPort returns the emulator port. It refuses a bind address that is
+// not a wildcard address, and port 0, because the front end needs both to be fixed.
 func (a args) frontEndPort(envPort string) (int, error) {
 	if a.hasBind {
 		return 0, errors.New("do not set the bind address with the TLS front end: the emulator listens on 127.0.0.1 and the front end on the other addresses")

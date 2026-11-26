@@ -74,9 +74,11 @@ func TestFrontEndPort(t *testing.T) {
 		{[]string{"-p", "x"}, "", 0, false},
 		{[]string{"--port="}, "", 0, false},
 		{[]string{"--port", "+9298"}, "", 0, false},
-		{[]string{"-b", "0.0.0.0"}, "", 0, false},
+		{[]string{"-b", "0.0.0.0"}, "", 9297, true},
+		{[]string{"--bind", "0.0.0.0", "--port", "9297", "--auth", "on"}, "", 9297, true},
+		{[]string{"-b=::"}, "", 9297, true},
+		{[]string{"-b", "10.0.0.1"}, "", 0, false},
 		{[]string{"-b127.0.0.1"}, "", 0, false},
-		{[]string{"-b=0.0.0.0"}, "", 0, false},
 		{[]string{"--bind=127.0.0.1"}, "", 0, false},
 	}
 	for _, c := range cases {
@@ -87,6 +89,26 @@ func TestFrontEndPort(t *testing.T) {
 		}
 		if (err == nil) != c.ok || got != c.want {
 			t.Errorf("port for %v, %q = %d, %v", c.args, c.env, got, err)
+		}
+	}
+}
+
+func TestRestRemovesWildcardBind(t *testing.T) {
+	cases := map[string]string{
+		"--bind 0.0.0.0 --port 9297 --auth on": "--port 9297 --auth on",
+		"-b0.0.0.0 -t off":                     "-t off",
+		"--bind=[::] -p 1":                     "-p 1",
+		"-b 10.0.0.1 -p 1":                     "-b 10.0.0.1 -p 1",
+		"-p 1 -- --bind 0.0.0.0":               "-p 1 -- --bind 0.0.0.0",
+		"-h":                                   "-h",
+	}
+	for in, want := range cases {
+		a, err := parseArgs(strings.Fields(in))
+		if err != nil {
+			t.Fatalf("parse %q: %v", in, err)
+		}
+		if got := strings.Join(a.rest, " "); got != want {
+			t.Errorf("rest for %q = %q, want %q", in, got, want)
 		}
 	}
 }
